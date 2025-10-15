@@ -52,7 +52,9 @@ export default function SignInPage() {
         router.push("/dashboard");
       }
     } catch (error) {
-      console.error("Sign in error:", error);
+      console.error("Email sign in error:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
       
       // Handle specific Firebase auth errors
       let errorMessage = "Failed to sign in. Please try again.";
@@ -64,6 +66,14 @@ export default function SignInPage() {
         errorMessage = "Incorrect password. Please try again.";
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = "Too many failed attempts. Please try again later.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Invalid email address format.";
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = "This account has been disabled.";
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (error.code) {
+        errorMessage = `Authentication error: ${error.code}`;
       }
       
       toast.error(errorMessage);
@@ -87,8 +97,25 @@ export default function SignInPage() {
         router.push("/dashboard");
       }
     } catch (error) {
-      console.error("Sign in error:", error);
-      toast.error("Failed to sign in. Please try again.");
+      console.error("Google sign in error:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
+      
+      let errorMessage = "Failed to sign in with Google. Please try again.";
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = "Sign-in was cancelled.";
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = "Pop-up was blocked. Redirecting to Google sign-in...";
+        toast.info(errorMessage);
+        // Don't set loading to false here, as redirect will handle it
+        return;
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (error.code) {
+        errorMessage = `Authentication error: ${error.code}`;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -33,7 +33,7 @@ const HeroSection = () => {
       <div className="flex flex-col justify-center items-center h-full space-y-12 text-center relative z-20 pointer-events-none">
         <div className="space-y-8 mx-auto px-4">
           <h1 className="text-4xl font-bold md:text-5xl lg:text-6xl xl:text-7xl gradient-title animate-gradient drop-shadow-lg">
-            Your Pravartak-AI Coach for
+            Your AI Career Coach for
             <br />
             <span className="text-white drop-shadow-xl">Professional Success</span>
           </h1>

@@ -3,7 +3,28 @@ import { db } from '@/lib/prisma';
 
 export async function POST(request) {
   try {
-    const { firebaseUser } = await request.json();
+    // Check if request has a body
+    const contentLength = request.headers.get('content-length');
+    if (!contentLength || contentLength === '0') {
+      console.error('Empty request body received');
+      return NextResponse.json(
+        { error: 'Empty request body' },
+        { status: 400 }
+      );
+    }
+
+    let requestData;
+    try {
+      requestData = await request.json();
+    } catch (jsonError) {
+      console.error('Failed to parse JSON:', jsonError);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+
+    const { firebaseUser } = requestData;
     
     if (!firebaseUser || !firebaseUser.uid) {
       console.error('Invalid user data received:', firebaseUser);

@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { 
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut, 
@@ -71,11 +73,28 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     });
 
+    // Check for redirect result on app load
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          console.log('Redirect sign-in successful:', result.user.uid);
+          // The onAuthStateChanged will handle the rest
+        }
+      } catch (error) {
+        console.error('Redirect result error:', error);
+        setLoading(false);
+      }
+    };
+
+    checkRedirectResult();
+
     return unsubscribe;
   }, []);
 
   const signInWithGoogle = async () => {
     try {
+      // First try popup method
       const result = await signInWithPopup(auth, googleProvider);
       
       // Check if there's a stored redirect path
@@ -87,8 +106,25 @@ export const AuthProvider = ({ children }) => {
       
       return result.user;
     } catch (error) {
-      console.error('Error signing in with Google:', error);
-      throw error;
+      console.error('Popup sign-in failed:', error);
+      
+      // If popup was blocked, try redirect method
+      if (error.code === 'auth/popup-blocked') {
+        console.log('Popup blocked, trying redirect method...');
+        try {
+          // Store current path for redirect after sign-in
+          const redirectPath = sessionStorage.getItem('redirectAfterLogin') || '/dashboard';
+          sessionStorage.setItem('redirectAfterLogin', redirectPath);
+          
+          await signInWithRedirect(auth, googleProvider);
+          // The redirect will handle the rest, so we don't return anything here
+        } catch (redirectError) {
+          console.error('Redirect sign-in also failed:', redirectError);
+          throw redirectError;
+        }
+      } else {
+        throw error;
+      }
     }
   };
 
