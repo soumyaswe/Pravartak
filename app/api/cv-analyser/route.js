@@ -61,7 +61,7 @@ try {
   }
   
   genAI = new GoogleGenerativeAI(apiKey);
-  model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+  model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   console.log("Gemini API configured successfully for CV analysis.");
 } catch (error) {
   console.error("Error configuring Gemini API for CV analysis:", error);

@@ -28,7 +28,7 @@ export async function POST(request) {
       );
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // For now, we'll simulate speech analysis since we don't have Google Cloud Speech API
     // In a real implementation, you would:
