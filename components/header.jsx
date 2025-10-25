@@ -52,8 +52,8 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 w-full border-b border-border/20 bg-background/60 backdrop-blur-xl z-50 supports-[backdrop-filter]:bg-background/40">
-      <nav className="container mx-auto px-6 h-20 flex items-center justify-between">
-        <div className="ml-16 md:ml-20">
+      <nav className="container mx-auto px-3 h-20 flex items-center justify-between">
+        <div>
           <Link href="/">
             <Image
               src={"/logo.png"}
