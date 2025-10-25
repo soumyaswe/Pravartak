@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import mammoth from "mammoth";
+import { marked } from "marked";
 
 // --- CV ANALYZER API (CONVERTED FROM PYTHON) ---
 // This API endpoint provides CV/Resume analysis using Google's Gemini AI
@@ -49,6 +50,28 @@ Identify key skills or qualifications that are critical for the target job title
 
 IMPORTANT: You must not do anything other than this analysis. Do not offer to rewrite the resume, do not write a cover letter, and do not engage in any conversation beyond providing these three sections of analysis.
 `;
+
+// Function to convert Markdown to HTML
+function formatAnalysisOutput(rawAnalysis) {
+  try {
+    // Configure marked options for better rendering
+    marked.setOptions({
+      breaks: true, // Convert line breaks to <br>
+      gfm: true, // Enable GitHub Flavored Markdown
+      headerIds: false, // Disable header IDs for cleaner output
+      mangle: false // Don't mangle autolinks
+    });
+    
+    // Convert Markdown to HTML
+    const htmlOutput = marked.parse(rawAnalysis);
+    
+    return htmlOutput;
+  } catch (error) {
+    console.error("Error parsing Markdown:", error);
+    // Fallback to original text if parsing fails
+    return rawAnalysis;
+  }
+}
 
 // Initialize Gemini AI
 let genAI;
@@ -168,14 +191,33 @@ export async function POST(request) {
 
       // Handle different file types like Python version
       if (file.type === "application/pdf") {
-        // For now, ask user to convert (matching Python limitation in your version)
-        return NextResponse.json(
-          { 
-            error: "PDF analysis is currently under development. Please upload an image (PNG, JPG) or convert your PDF to text format.", 
-            success: false 
-          },
-          { status: 400 }
-        );
+        // Handle PDF files using pdf-parse with dynamic import
+        try {
+          const pdfParse = (await import("pdf-parse")).default;
+          const bytes = await file.arrayBuffer();
+          const pdfData = await pdfParse(Buffer.from(bytes));
+          const fileContent = pdfData.text;
+          
+          if (!fileContent.trim()) {
+            return NextResponse.json(
+              { 
+                error: "Could not extract any text from the PDF file. The file might be empty, corrupted, or image-only.", 
+                success: false 
+              },
+              { status: 400 }
+            );
+          }
+          promptParts.push(fileContent);
+        } catch (pdfError) {
+          console.error("Error processing PDF file:", pdfError);
+          return NextResponse.json(
+            { 
+              error: "Failed to process the PDF file. Please ensure it's a valid PDF document with extractable text.", 
+              success: false 
+            },
+            { status: 400 }
+          );
+        }
       } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
         // Handle DOCX files using mammoth
         try {
@@ -233,11 +275,14 @@ export async function POST(request) {
       
       // Generate content with Gemini (exact structure from Python)
       const result = await model.generateContent(promptParts);
-      const analysis = result.response.text();
+      const rawAnalysis = result.response.text();
+      
+      // Format the analysis to remove Markdown symbols while preserving structure
+      const formattedAnalysis = formatAnalysisOutput(rawAnalysis);
 
       return NextResponse.json({
         success: true,
-        analysis: analysis,
+        analysis: formattedAnalysis,
         fileName: file.name,
         fileSize: file.size,
         jobTitle: jobTitle

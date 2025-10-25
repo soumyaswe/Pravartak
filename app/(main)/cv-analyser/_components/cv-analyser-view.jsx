@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import DOMPurify from "dompurify";
 import {
   Upload,
   FileText,
@@ -148,8 +149,116 @@ const CvAnalyserView = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  // Function to sanitize HTML content
+  const sanitizeHTML = (htmlContent) => {
+    if (typeof window !== 'undefined') {
+      // Configure DOMPurify to allow common formatting tags
+      const cleanHTML = DOMPurify.sanitize(htmlContent, {
+        ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code'],
+        ALLOWED_ATTR: ['class', 'id']
+      });
+      return cleanHTML;
+    }
+    // Fallback for server-side rendering
+    return htmlContent;
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
+      <style dangerouslySetInnerHTML={{__html: `
+        .formatted-analysis h1 {
+          font-size: 1.5rem;
+          font-weight: bold;
+          color: hsl(var(--primary));
+          margin: 1.5rem 0 1rem 0;
+        }
+        .formatted-analysis h2 {
+          font-size: 1.5rem;
+          font-weight: bold;
+          color: hsl(var(--foreground));
+          margin: 1.25rem 0 0.75rem 0;
+        }
+        .formatted-analysis h3 {
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: hsl(var(--foreground));
+          margin: 1rem 0 0.5rem 0;
+        }
+        .formatted-analysis p {
+          font-size: 1rem;
+          font-weight: normal;
+          margin: 0.5rem 0;
+          line-height: 1.6;
+        }
+        .formatted-analysis ul, .formatted-analysis ol {
+          font-size: 1rem;
+          margin: 0.75rem 0;
+          padding-left: 2rem;
+          list-style-type: disc;
+        }
+        .formatted-analysis ol {
+          list-style-type: decimal;
+        }
+        .formatted-analysis li {
+          font-size: 1rem;
+          font-weight: normal;
+          margin: 0.5rem 0;
+          line-height: 1.6;
+          display: list-item;
+        }
+        .formatted-analysis strong {
+          font-weight: 600;
+          color: hsl(var(--foreground));
+        }
+        .formatted-analysis em {
+          font-style: italic;
+        }
+        .formatted-analysis blockquote {
+          font-size: 1rem;
+          border-left: 4px solid hsl(var(--primary));
+          padding-left: 1rem;
+          margin: 1rem 0;
+          font-style: italic;
+          color: hsl(var(--muted-foreground));
+        }
+        .formatted-analysis code {
+          background-color: hsl(var(--muted));
+          padding: 0.125rem 0.25rem;
+          border-radius: 0.25rem;
+          font-family: monospace;
+          font-size: 0.875rem;
+        }
+        @media (min-width: 640px) {
+          .formatted-analysis h1 {
+            font-size: 1.875rem;
+          }
+          .formatted-analysis h2 {
+            font-size: 1.5rem;
+            font-weight: bold;
+          }
+          .formatted-analysis h3 {
+            font-size: 1.375rem;
+          }
+          .formatted-analysis p {
+            font-size: 1.125rem;
+            font-weight: normal;
+            
+          }
+          .formatted-analysis li {
+            font-size: 1.125rem;
+            font-weight: normal;
+          }
+          .formatted-analysis ul, .formatted-analysis ol {
+            font-size: 1.125rem;
+          }
+          .formatted-analysis blockquote {
+            font-size: 1.125rem;
+          }
+          .formatted-analysis code {
+            font-size: 1rem;
+          }
+        }
+      `}} />
       {/* Header */}
       <div className="text-center space-y-3 sm:space-y-4">
         <h1 className="font-bold gradient-title text-5xl md:text-6xl">CV Analyser</h1>
@@ -330,9 +439,12 @@ const CvAnalyserView = () => {
 
               {/* Analysis Content */}
               <div className="prose prose-sm sm:prose max-w-none">
-                <div className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed">
-                  {analysisResult.analysis || analysisResult}
-                </div>
+                <div 
+                  className="leading-relaxed formatted-analysis"
+                  dangerouslySetInnerHTML={{ 
+                    __html: sanitizeHTML(analysisResult.analysis || analysisResult)
+                  }}
+                />
               </div>
             </div>
           </CardContent>
