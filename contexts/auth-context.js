@@ -49,7 +49,10 @@ export const AuthProvider = ({ children }) => {
           // Get Firebase ID token and set it as a cookie for server actions
           const idToken = await firebaseUser.getIdToken();
           console.log("Setting firebase-token cookie, token length:", idToken.length);
-          document.cookie = `firebase-token=${encodeURIComponent(idToken)}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+          
+          // Set cookies with proper configuration
+          const cookieOptions = `path=/; max-age=${60 * 60}; SameSite=Lax; Secure`;
+          document.cookie = `firebase-token=${encodeURIComponent(idToken)}; ${cookieOptions}`;
           
           // Also set user data cookie
           const userData = {
@@ -59,7 +62,15 @@ export const AuthProvider = ({ children }) => {
             photoURL: firebaseUser.photoURL
           };
           console.log("Setting firebase-user cookie for user:", userData.uid);
-          document.cookie = `firebase-user=${encodeURIComponent(JSON.stringify(userData))}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+          document.cookie = `firebase-user=${encodeURIComponent(JSON.stringify(userData))}; ${cookieOptions}`;
+          
+          // Verify cookies were set
+          const cookies = document.cookie;
+          console.log("Cookies after setting:", {
+            hasFirebaseUser: cookies.includes('firebase-user'),
+            hasFirebaseToken: cookies.includes('firebase-token'),
+            allCookies: cookies
+          });
         } catch (error) {
           console.error('Error checking user:', error);
           setUser(firebaseUser); // Still set user even if database check fails
