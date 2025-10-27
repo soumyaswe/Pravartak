@@ -64,6 +64,21 @@ export async function updateUser(data) {
   }
 }
 
+export async function getUserProfile() {
+  try {
+    const user = await getAuthenticatedUser();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return user;
+  } catch (error) {
+    console.error("Error getting user profile:", error);
+    throw new Error("Failed to get user profile");
+  }
+}
+
 export async function getUserOnboardingStatus() {
   try {
     const user = await getAuthenticatedUser();
