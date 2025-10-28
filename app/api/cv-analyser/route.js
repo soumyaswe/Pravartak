@@ -191,32 +191,60 @@ export async function POST(request) {
 
       // Handle different file types like Python version
       if (file.type === "application/pdf") {
-        // Handle PDF files using pdf-parse with dynamic import
+        // Handle PDF files - try text extraction first, fallback to image processing
         try {
           const pdfParse = (await import("pdf-parse")).default;
           const bytes = await file.arrayBuffer();
-          const pdfData = await pdfParse(Buffer.from(bytes));
+          const buffer = Buffer.from(bytes);
+          
+          console.log(`Processing PDF file: ${file.name}, size: ${file.size} bytes`);
+          
+          const pdfData = await pdfParse(buffer);
           const fileContent = pdfData.text;
           
+          console.log(`Extracted text length: ${fileContent.length} characters`);
+          
           if (!fileContent.trim()) {
+            console.log("No text extracted from PDF, treating as image-based PDF");
+            // If no text extracted, treat it as an image (scanned PDF)
+            const base64 = buffer.toString('base64');
+            promptParts.push({
+              inlineData: {
+                data: base64,
+                mimeType: "application/pdf"
+              }
+            });
+            console.log("PDF sent as image for OCR processing");
+          } else {
+            promptParts.push(fileContent);
+            console.log("PDF text extracted successfully");
+          }
+        } catch (pdfError) {
+          console.error("Error processing PDF file:", pdfError);
+          console.error("PDF error details:", pdfError.message);
+          
+          // Fallback: Try treating PDF as image if text extraction fails
+          try {
+            console.log("Attempting fallback: treating PDF as image");
+            const bytes = await file.arrayBuffer();
+            const base64 = Buffer.from(bytes).toString('base64');
+            promptParts.push({
+              inlineData: {
+                data: base64,
+                mimeType: "application/pdf"
+              }
+            });
+            console.log("PDF sent as image (fallback method)");
+          } catch (fallbackError) {
+            console.error("Fallback method also failed:", fallbackError);
             return NextResponse.json(
               { 
-                error: "Could not extract any text from the PDF file. The file might be empty, corrupted, or image-only.", 
+                error: `Failed to process the PDF file. Error: ${pdfError.message}. Please ensure it's a valid PDF document.`, 
                 success: false 
               },
               { status: 400 }
             );
           }
-          promptParts.push(fileContent);
-        } catch (pdfError) {
-          console.error("Error processing PDF file:", pdfError);
-          return NextResponse.json(
-            { 
-              error: "Failed to process the PDF file. Please ensure it's a valid PDF document with extractable text.", 
-              success: false 
-            },
-            { status: 400 }
-          );
         }
       } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
         // Handle DOCX files using mammoth
