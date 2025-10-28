@@ -36,9 +36,12 @@ export async function saveResume(content) {
 export async function getResume() {
   const user = await getAuthenticatedUser();
 
-  return await db.resume.findUnique({
+  return await db.resume.findFirst({
     where: {
       userId: user.id,
+    },
+    orderBy: {
+      updatedAt: 'desc',
     },
   });
 }

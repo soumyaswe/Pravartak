@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,39 +12,37 @@ import {
   FileText, 
   MessageCircle, 
   TrendingUp,
-  User
+  User,
+  Loader2
 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { getDashboardStats } from '@/lib/data-helpers';
 
-const recentActivities = [
-  {
-    action: 'CV Analyzed',
-    time: '2 hours ago',
-    score: 87,
-    type: 'analysis',
-    icon: FileText
-  },
-  {
-    action: 'Mock Interview Completed',
-    time: '1 day ago',
-    score: 4.5,
-    type: 'interview',
-    icon: MessageCircle
-  },
-  {
-    action: 'Resume Updated',
-    time: '3 days ago',
-    score: 5,
-    type: 'document',
-    icon: FileText
-  },
-  {
-    action: 'Industry Insights Viewed',
-    time: '5 days ago',
-    score: null,
-    type: 'research',
-    icon: TrendingUp
-  }
-];
+function getTimeAgo(dateString) {
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffInMs = now - past;
+  const diffInMins = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  if (diffInMins < 1) return 'Just now';
+  if (diffInMins < 60) return `${diffInMins} minute${diffInMins > 1 ? 's' : ''} ago`;
+  if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+  if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  return past.toLocaleDateString();
+}
+
+function getActivityTypeLabel(type) {
+  const labels = {
+    RESUME_CREATED: 'Resume Created',
+    RESUME_UPDATED: 'Resume Updated',
+    COVER_LETTER_CREATED: 'Cover Letter Created',
+    MOCK_INTERVIEW_COMPLETED: 'Mock Interview Completed',
+    ASSESSMENT_COMPLETED: 'Assessment Completed'
+  };
+  return labels[type] || type;
+}
 
 const aiRecommendations = [
   {
@@ -56,7 +55,7 @@ const aiRecommendations = [
     title: 'Update LinkedIn Profile',
     description: 'Add your recent certifications',
     priority: 'medium',
-    href: '/profile'
+    href: '/onboarding'
   },
   {
     title: 'Apply to Software Engineer Roles',
@@ -73,6 +72,26 @@ const aiRecommendations = [
 ];
 
 export default function ActivityAndRecommendations() {
+  const { user } = useAuth();
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchActivities() {
+      if (!user?.uid) return;
+      
+      try {
+        const { stats } = await getDashboardStats(user.uid);
+        setActivities(stats.recentActivity || []);
+      } catch (error) {
+        console.error('Error fetching activities:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchActivities();
+  }, [user]);
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'high': return 'bg-red-500';
@@ -83,13 +102,11 @@ export default function ActivityAndRecommendations() {
   };
 
   const getActivityIcon = (type) => {
-    switch (type) {
-      case 'analysis': return FileText;
-      case 'interview': return MessageCircle;
-      case 'document': return FileText;
-      case 'research': return TrendingUp;
-      default: return CheckCircle;
-    }
+    if (type?.includes('RESUME')) return FileText;
+    if (type?.includes('COVER_LETTER')) return FileText;
+    if (type?.includes('INTERVIEW')) return MessageCircle;
+    if (type?.includes('ASSESSMENT')) return TrendingUp;
+    return CheckCircle;
   };
 
   return (
@@ -103,39 +120,44 @@ export default function ActivityAndRecommendations() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {recentActivities.map((activity, index) => {
-              const Icon = getActivityIcon(activity.type);
-              
-              return (
-                <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <div className="p-2 rounded-full bg-primary/10">
-                    <Icon className="h-4 w-4 text-primary" />
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : activities.length === 0 ? (
+            <div className="text-center p-8 text-muted-foreground">
+              <p className="text-sm">No recent activity yet.</p>
+              <p className="text-xs mt-2">Start creating resumes or taking mock interviews!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {activities.map((activity, index) => {
+                const Icon = getActivityIcon(activity.type);
+                
+                return (
+                  <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <Icon className="h-4 w-4 text-primary" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground text-sm">
+                        {getActivityTypeLabel(activity.type)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {getTimeAgo(activity.timestamp)}
+                      </p>
+                      {activity.metadata?.title && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {activity.metadata.title}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground text-sm">
-                      {activity.action}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {activity.time}
-                    </p>
-                  </div>
-                  
-                  {activity.score && (
-                    <Badge variant="secondary" className="text-xs">
-                      {activity.type === 'interview' ? `${activity.score}/5` : `${activity.score}%`}
-                    </Badge>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          
-          <Button variant="outline" className="w-full mt-4 text-sm">
-            View All Activity
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 

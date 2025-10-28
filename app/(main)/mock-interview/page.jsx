@@ -9,6 +9,9 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/auth-context';
+import { saveMockInterviewToDb } from '@/lib/data-helpers';
 import {
   Play,
   Pause,
@@ -30,6 +33,7 @@ import JobRoleSetup from './_components/job-role-setup';
 import AnalysisResults from './_components/analysis-results';
 
 export default function MockInterviewPage() {
+  const { user } = useAuth();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isInterviewStarted, setIsInterviewStarted] = useState(false);
   const [isInterviewCompleted, setIsInterviewCompleted] = useState(false);
@@ -103,6 +107,13 @@ export default function MockInterviewPage() {
     setIsGeneratingAnalysis(true);
     
     try {
+      // Check if we have any analysis history
+      if (analysisHistory.length === 0) {
+        toast.error('No answers recorded. Please answer at least one question.');
+        setIsGeneratingAnalysis(false);
+        return;
+      }
+
       const response = await fetch('/api/mock-interview/final-analysis', {
         method: 'POST',
         headers: {
@@ -114,13 +125,81 @@ export default function MockInterviewPage() {
         }),
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate analysis');
+      }
 
-      if (response.ok) {
-        setFinalAnalysis(data);
+      const data = await response.json();
+      setFinalAnalysis(data);
+      
+      // Save interview results to database
+      if (user?.uid && data) {
+        try {
+          // Calculate scores from metrics
+          const overallScore = data.metrics?.avgContentScore 
+            ? (data.metrics.avgContentScore / 5) * 100 
+            : null;
+          
+          const communicationScore = data.metrics?.avgConfidence || null;
+          
+          // Calculate content and clarity scores based on available metrics
+          const contentScore = data.metrics?.avgContentScore 
+            ? (data.metrics.avgContentScore / 5) * 100 
+            : null;
+          
+          // Clarity score based on speech metrics (WPM and fillers)
+          let clarityScore = null;
+          if (data.metrics?.avgWpm && data.metrics?.totalFillers !== undefined) {
+            const wpmScore = Math.max(0, Math.min(100, ((data.metrics.avgWpm - 100) / 50) * 50 + 50));
+            const fillerPenalty = Math.min(30, data.metrics.totalFillers * 5);
+            clarityScore = Math.max(0, wpmScore - fillerPenalty);
+          }
+
+          // Extract strengths and improvements from analysis text
+          const analysisText = data.analysis || '';
+          const strengthsMatch = analysisText.match(/##\s*💪\s*Strengths([\s\S]*?)##/i);
+          const improvementsMatch = analysisText.match(/##\s*📈\s*Areas for Improvement([\s\S]*?)##/i);
+          
+          const strengths = strengthsMatch 
+            ? strengthsMatch[1].split('\n').filter(line => line.trim().startsWith('-')).map(line => line.replace(/^-\s*/, '').trim())
+            : ['Good effort'];
+          
+          const improvements = improvementsMatch
+            ? improvementsMatch[1].split('\n').filter(line => line.trim().startsWith('-')).map(line => line.replace(/^-\s*/, '').trim())
+            : ['Keep practicing'];
+
+          await saveMockInterviewToDb({
+            firebaseUserId: user.uid,
+            type: 'BEHAVIORAL', // or get from state
+            industry: user.industry || 'General',
+            experienceLevel: user.experience || 'INTERMEDIATE',
+            duration: Math.round((Date.now() - sessionStartTime) / 1000 / 60), // minutes
+            questions: questions.map(q => q.question || q),
+            responses: analysisHistory.map(h => h.response || ''),
+            overallScore,
+            communicationScore,
+            contentScore,
+            clarityScore,
+            feedback: data.analysis,
+            strengths,
+            improvements,
+            recommendations: ['Continue practicing', 'Review feedback carefully'],
+            email: user.email,
+            name: user.displayName || user.name || 'User',
+          });
+          toast.success('Interview results saved successfully!');
+        } catch (saveError) {
+          console.error('Error saving interview results:', saveError);
+          toast.error('Interview completed but failed to save results');
+        }
       }
     } catch (error) {
       console.error('Error generating final analysis:', error);
+      toast.error(error.message || 'Failed to complete interview analysis');
+      
+      // Still mark as completed but with no analysis
+      setFinalAnalysis(null);
     } finally {
       setIsGeneratingAnalysis(false);
       setIsInterviewCompleted(true);

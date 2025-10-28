@@ -24,12 +24,16 @@ import { useAuth } from "@/contexts/auth-context";
 import { entriesToMarkdown } from "@/app/lib/helper";
 import { resumeSchema } from "@/app/lib/schema";
 import html2pdf from "html2pdf.js/dist/html2pdf.min.js";
+import { saveResumeToDb } from "@/lib/data-helpers";
 
-export default function ResumeBuilder({ initialContent }) {
+export default function ResumeBuilder({ initialResume }) {
   const [activeTab, setActiveTab] = useState("edit");
-  const [previewContent, setPreviewContent] = useState(initialContent);
+  // If we have a resume with content, convert it to markdown preview
+  const [previewContent, setPreviewContent] = useState("");
   const { user } = useAuth();
   const [resumeMode, setResumeMode] = useState("preview");
+  const [isSavingToDb, setIsSavingToDb] = useState(false);
+  const [resumeId, setResumeId] = useState(initialResume?.id || null);
 
   const {
     control,
@@ -60,14 +64,28 @@ export default function ResumeBuilder({ initialContent }) {
   const formValues = watch();
 
   useEffect(() => {
-    if (initialContent) setActiveTab("preview");
-  }, [initialContent]);
+    if (initialResume?.content) {
+      // Handle different content formats
+      if (typeof initialResume.content === 'string') {
+        // Legacy: content is markdown string
+        setPreviewContent(initialResume.content);
+        setActiveTab("preview");
+      } else if (typeof initialResume.content === 'object' && initialResume.content.markdown) {
+        // New format: { markdown: "...", formData: {...} }
+        setPreviewContent(initialResume.content.markdown);
+        setActiveTab("preview");
+      }
+    }
+  }, [initialResume]);
 
   // Update preview content when form values change
   useEffect(() => {
     if (activeTab === "edit") {
       const newContent = getCombinedContent();
-      setPreviewContent(newContent ? newContent : initialContent);
+      const initialMarkdown = typeof initialResume?.content === 'string' 
+        ? initialResume.content 
+        : initialResume?.content?.markdown || "";
+      setPreviewContent(newContent ? newContent : initialMarkdown);
     }
   }, [formValues, activeTab]);
 
@@ -133,16 +151,37 @@ export default function ResumeBuilder({ initialContent }) {
   };
 
   const onSubmit = async (data) => {
+    setIsSavingToDb(true);
     try {
       const formattedContent = previewContent
         .replace(/\n/g, "\n") // Normalize newlines
         .replace(/\n\s*\n/g, "\n\n") // Normalize multiple newlines to double newlines
         .trim();
 
-      console.log(previewContent, formattedContent);
-      await saveResumeFn(previewContent);
+      // Save to database
+      if (user?.uid) {
+        const result = await saveResumeToDb({
+          firebaseUserId: user.uid,
+          title: `Resume - ${new Date().toLocaleDateString()}`,
+          content: typeof formattedContent === 'string' 
+            ? { markdown: formattedContent, formData: data }
+            : formattedContent,
+          templateId: "default",
+          status: "DRAFT",
+          email: user.email,
+          name: user.displayName || user.fullName || user.name,
+        });
+        
+        toast.success("Resume saved successfully!");
+        console.log("Saved resume:", result);
+      } else {
+        toast.error("Please sign in to save your resume");
+      }
     } catch (error) {
       console.error("Save error:", error);
+      toast.error(error.message || "Failed to save resume");
+    } finally {
+      setIsSavingToDb(false);
     }
   };
 
@@ -156,9 +195,9 @@ export default function ResumeBuilder({ initialContent }) {
           <Button
             variant="destructive"
             onClick={handleSubmit(onSubmit)}
-            disabled={isSaving}
+            disabled={isSaving || isSavingToDb}
           >
-            {isSaving ? (
+            {(isSaving || isSavingToDb) ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Saving...

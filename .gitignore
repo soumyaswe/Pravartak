@@ -45,5 +45,47 @@ next-env.d.ts
 # clerk (legacy authentication)
 .clerk/
 
+# Firebase hosting files (using App Engine instead)
+firebase.json
+.firebaserc
+apphosting.yaml
 
+# Firebase Data Connect (unused)
+dataconnect/
+src/dataconnect-generated/
+
+# Empty GitHub workflows
+.github/workflows/
+
+# Backup files
+backups/
+*.backup
+*.backup_*
+
+# Documentation (temporary guides)
+docs/
+DATA_FLOW_GUIDE.md
+MISSING_FEATURES_GUIDE.md
 FIREBASE_ENV_SETUP.md
+
+# Migration scripts (no longer needed)
+scripts/cleanup-and-setup.ps1
+scripts/cloud-sql-setup.ps1
+scripts/fresh-gcp-setup.ps1
+scripts/migrate-data.js
+scripts/pre-migration-check.js
+scripts/verify-migration.js
+
+# Build artifacts
+out/
+
+# Cloud SQL Proxy
+cloud-sql-proxy.exe
+cloud-sql-proxy
+
+# Debug logs
+*.log
+firebase-debug.log
+
+# Old config files
+.eslintrc.json

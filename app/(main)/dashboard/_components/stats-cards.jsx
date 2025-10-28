@@ -1,36 +1,74 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, FileText, CheckCircle, Target, MessageCircle } from 'lucide-react';
-
-const careerStatsData = [
-  {
-    title: 'Profile Score',
-    value: '85%',
-    icon: CheckCircle,
-    color: 'text-green-500'
-  },
-  {
-    title: 'Documents',
-    value: '3/4',
-    icon: FileText,
-    color: 'text-blue-500'
-  },
-  {
-    title: 'Interviews',
-    value: '12',
-    icon: MessageCircle,
-    color: 'text-purple-500'
-  },
-  {
-    title: 'Career Score',
-    value: '4.2/5',
-    icon: Target,
-    color: 'text-orange-500'
-  }
-];
+import { TrendingUp, TrendingDown, FileText, CheckCircle, Target, MessageCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { getDashboardStats } from '@/lib/data-helpers';
 
 export default function StatsCards() {
+  const { user } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      if (!user?.uid) return;
+      
+      try {
+        const { stats: dashboardStats } = await getDashboardStats(user.uid);
+        setStats(dashboardStats);
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStats();
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="bg-card border-border">
+            <CardContent className="p-4 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  const careerStatsData = [
+    {
+      title: 'Profile Completion',
+      value: `${stats?.profileCompletion || 0}%`,
+      icon: CheckCircle,
+      color: stats?.profileCompletion >= 80 ? 'text-green-500' : stats?.profileCompletion >= 50 ? 'text-yellow-500' : 'text-red-500'
+    },
+    {
+      title: 'Documents Created',
+      value: stats?.documentsCreated || 0,
+      icon: FileText,
+      color: 'text-blue-500'
+    },
+    {
+      title: 'Interview Sessions',
+      value: stats?.interviewSessions || 0,
+      icon: MessageCircle,
+      color: 'text-purple-500'
+    },
+    {
+      title: 'Latest Mock Score',
+      value: stats?.latestMockScore ? `${stats.latestMockScore.toFixed(1)}/100` : 'N/A',
+      icon: Target,
+      color: stats?.latestMockScore >= 70 ? 'text-green-500' : stats?.latestMockScore >= 50 ? 'text-yellow-500' : 'text-orange-500'
+    }
+  ];
+
   return (
     <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
       {careerStatsData.map((stat, index) => {
