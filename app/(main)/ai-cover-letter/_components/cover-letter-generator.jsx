@@ -328,80 +328,156 @@ export default function CoverLetterGenerator() {
     }, [jobTitle, companyName, jobDescription, tone, resumeText]);
 
     const handleDownload = useCallback(() => {
+        // Build a selectable, well-formatted PDF by walking the HTML nodes
         const element = letterContentRef.current;
         if (!element || element.innerHTML.trim() === "") {
             showToast('There is no content to download.', 'error');
             return;
         }
 
-        try {
-            // Load jsPDF dynamically if not already loaded
-            const loadJsPDF = async () => {
-                if (!window.jspdf) {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-                    script.async = true;
-                    await new Promise((resolve, reject) => {
-                        script.onload = resolve;
-                        script.onerror = reject;
-                        document.body.appendChild(script);
-                    });
+        // Load jsPDF dynamically if not present
+        const loadJsPDF = () => {
+            return new Promise((resolve, reject) => {
+                if (window.jspdf && (window.jspdf.jsPDF || window.jspdf)) {
+                    resolve(window.jspdf.jsPDF || window.jspdf);
+                    return;
                 }
-                return window.jspdf.jsPDF;
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                script.async = true;
+                script.onload = () => {
+                    resolve(window.jspdf && (window.jspdf.jsPDF || window.jspdf));
+                };
+                script.onerror = (e) => reject(e);
+                document.body.appendChild(script);
+            });
+        };
+
+        loadJsPDF().then((jsPDFFactory) => {
+            // jsPDFFactory is the constructor
+            const doc = new jsPDFFactory({ unit: 'in', format: 'letter', orientation: 'portrait' });
+
+            // Page layout
+            const pageWidth = 8.5;
+            const pageHeight = 11;
+            const margin = 1; // 1 inch margins
+            const maxLineWidth = pageWidth - 2 * margin;
+
+            // Typography
+            const fontSize = 11;
+            const lineHeight = 0.18; // inches (approx for 11pt)
+            doc.setFont('times', 'normal');
+            doc.setFontSize(fontSize);
+
+            // Starting position
+            let x = margin;
+            let y = margin;
+
+            // Helper to check page break
+            const checkPageBreak = (spaceNeeded = lineHeight) => {
+                if (y + spaceNeeded > pageHeight - margin) {
+                    doc.addPage();
+                    y = margin;
+                }
             };
 
-            loadJsPDF().then((jsPDF) => {
-                // Extract text content from HTML
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = letterHtml;
-                const textContent = tempDiv.innerText;
+            // Parse the element HTML into a DOM we can walk
+            const parser = new DOMParser();
+            const parsed = parser.parseFromString(element.innerHTML || '', 'text/html');
+            const nodes = Array.from(parsed.body.childNodes || []);
 
-                // Create PDF with actual text
-                const doc = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'in',
-                    format: 'letter'
-                });
+            // Recursive node parser
+            const parseNode = (node) => {
+                if (!node) return;
 
-                // Set font
-                doc.setFont('times', 'normal');
-                doc.setFontSize(11);
+                // Text node
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent.replace(/\s+/g, ' ').trim();
+                    if (!text) return;
 
-                // Add text with proper wrapping
-                const pageWidth = 8.5;
-                const pageHeight = 11;
-                const margin = 1;
-                const maxLineWidth = pageWidth - (2 * margin);
-                
-                // Split text into lines and add to PDF
-                const lines = doc.splitTextToSize(textContent, maxLineWidth);
-                
-                let y = margin;
-                const lineHeight = 0.18; // Approximately 1.5 line spacing for 11pt font
-                
-                lines.forEach((line, index) => {
-                    // Check if we need a new page
-                    if (y + lineHeight > pageHeight - margin) {
-                        doc.addPage();
-                        y = margin;
+                    // Split text to size (returns an array of lines)
+                    const lines = doc.splitTextToSize(text, maxLineWidth);
+                    const needed = lines.length * lineHeight;
+                    checkPageBreak(needed);
+
+                    lines.forEach((line) => {
+                        doc.text(line, x, y);
+                        y += lineHeight;
+                    });
+                    return;
+                }
+
+                // Element node
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const tag = node.nodeName.toLowerCase();
+
+                    switch (tag) {
+                        case 'p':
+                        case 'div':
+                        case 'section':
+                        case 'article':
+                            // Process children, then add paragraph spacing
+                            Array.from(node.childNodes).forEach(child => parseNode(child));
+                            y += lineHeight * 0.5;
+                            return;
+                        case 'br':
+                            y += lineHeight;
+                            return;
+                        case 'strong':
+                        case 'b':
+                            // Bold
+                            try { doc.setFont('times', 'bold'); } catch (e) {}
+                            Array.from(node.childNodes).forEach(child => parseNode(child));
+                            try { doc.setFont('times', 'normal'); } catch (e) {}
+                            return;
+                        case 'em':
+                        case 'i':
+                            // Italic
+                            try { doc.setFont('times', 'italic'); } catch (e) {}
+                            Array.from(node.childNodes).forEach(child => parseNode(child));
+                            try { doc.setFont('times', 'normal'); } catch (e) {}
+                            return;
+                        case 'ul':
+                        case 'ol':
+                            Array.from(node.childNodes).forEach(child => {
+                                if (child.nodeName && child.nodeName.toLowerCase() === 'li') {
+                                    // Bullet or number
+                                    const marker = tag === 'ol' ? '• ' : '• ';
+                                    // Prepend marker as a text node
+                                    parseNode(document.createTextNode(marker));
+                                    Array.from(child.childNodes).forEach(grand => parseNode(grand));
+                                    y += lineHeight * 0.2;
+                                }
+                            });
+                            y += lineHeight * 0.3;
+                            return;
+                        default:
+                            // inline or unknown: process children
+                            Array.from(node.childNodes).forEach(child => parseNode(child));
+                            return;
                     }
-                    
-                    doc.text(line, margin, y);
-                    y += lineHeight;
-                });
+                }
+            };
 
-                // Save the PDF
-                doc.save(`Cover_Letter_${companyName || 'Document'}.pdf`);
+            // Walk top-level nodes
+            nodes.forEach(node => parseNode(node));
+
+            // Save the PDF
+            try {
+                const filename = `Cover_Letter_${companyName || 'Document'}.pdf`;
+                doc.save(filename);
                 showToast('PDF downloaded successfully!');
-            }).catch((error) => {
-                console.error('PDF generation error:', error);
-                showToast('Failed to generate PDF. Please try again.', 'error');
-            });
-        } catch (error) {
-            console.error('Download error:', error);
-            showToast('Failed to download PDF. Please try again.', 'error');
-        }
-    }, [companyName, letterHtml]);
+            } catch (err) {
+                console.error('PDF save error:', err);
+                showToast('Failed to save PDF. Please try again.', 'error');
+            }
+
+        }).catch((err) => {
+            console.error('Failed to load jsPDF:', err);
+            showToast('PDF tools failed to load. Please refresh and try again.', 'error');
+        });
+
+    }, [companyName]);
 
     const handleSave = useCallback(async () => {
         if (!letterHtml) {
