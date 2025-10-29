@@ -53,6 +53,52 @@ try {
   console.error("Error configuring Gemini API:", error);
 }
 
+// Helper function to detect if a message seems incomplete or fragmented
+function isMessageIncomplete(message) {
+  const incompletePhrases = [
+    /\.\.\.$/, // Ends with ellipsis
+    /^and\s+/i, // Starts with "and"
+    /^but\s+/i, // Starts with "but"
+    /^or\s+/i, // Starts with "or"
+    /^also\s+/i, // Starts with "also"
+    /^additionally\s+/i, // Starts with "additionally"
+    /^furthermore\s+/i, // Starts with "furthermore"
+    /^because\s+/i, // Starts with "because"
+    /^so\s+/i, // Starts with "so"
+    /^then\s+/i, // Starts with "then"
+    /^that\s+/i, // Starts with "that"
+    /^which\s+/i, // Starts with "which"
+    /^where\s+/i, // Starts with "where"
+    /^when\s+/i, // Starts with "when"
+    /^why\s+/i, // Starts with "why"
+    /^how\s+about/i, // Starts with "how about"
+    /^what\s+about/i, // Starts with "what about"
+  ];
+
+  return incompletePhrases.some(pattern => pattern.test(message.trim()));
+}
+
+// Helper function to build conversation context from message history
+function buildConversationContext(messageHistory, currentMessage) {
+  if (!messageHistory || messageHistory.length === 0) {
+    return currentMessage;
+  }
+
+  // Get the last few messages for context (limit to last 10 messages to avoid token overflow)
+  const recentMessages = messageHistory.slice(-10);
+  
+  // Format conversation history
+  let conversationContext = "Previous conversation:\n";
+  recentMessages.forEach(msg => {
+    const role = msg.sender === 'user' ? 'User' : 'Assistant';
+    conversationContext += `${role}: ${msg.text}\n`;
+  });
+  
+  conversationContext += `\nCurrent User Message: ${currentMessage}`;
+  
+  return conversationContext;
+}
+
 export async function POST(request) {
   try {
     // Check if API is configured
@@ -66,7 +112,7 @@ export async function POST(request) {
       );
     }
 
-    const { message, hasImage = false } = await request.json();
+    const { message, hasImage = false, messageHistory = [] } = await request.json();
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -97,8 +143,19 @@ export async function POST(request) {
 
     // --- API Call ---
     try {
-      // Prepare the content for the API call
-      const promptParts = [SYSTEM_PROMPT, `User's question: '${message}'`];
+      // Detect if the message is incomplete and build context if needed
+      const messageIsIncomplete = isMessageIncomplete(message);
+      const contextualMessage = messageIsIncomplete || messageHistory.length > 0
+        ? buildConversationContext(messageHistory, message)
+        : message;
+
+      // Prepare the content for the API call with conversation context
+      const promptParts = [
+        SYSTEM_PROMPT,
+        messageIsIncomplete 
+          ? `Note: The user's current message appears to be a continuation or follow-up to previous messages. Consider the conversation history to provide a coherent response.\n\n${contextualMessage}`
+          : contextualMessage
+      ];
       
       let response;
       if (hasImage) {

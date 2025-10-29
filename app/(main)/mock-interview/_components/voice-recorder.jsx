@@ -42,12 +42,12 @@ export default function VoiceRecorder({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(existingAnswer?.analysis || null);
   const [transcript, setTranscript] = useState('');
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const audioRef = useRef(null);
   const intervalRef = useRef(null);
   const chunksRef = useRef([]);
-  const recognitionRef = useRef(null);
 
   // Format time in MM:SS format
   const formatTime = (seconds) => {
@@ -56,50 +56,33 @@ export default function VoiceRecorder({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  // Setup speech recognition for real-time transcription
-  const setupSpeechRecognition = () => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
+  // Transcribe audio using Google Cloud Speech-to-Text API
+  const transcribeAudio = async (audioBlob) => {
+    setIsTranscribing(true);
+    try {
+      console.log('Transcribing audio with Google Cloud Speech-to-Text...');
+      const formData = new FormData();
+      formData.append('audio', audioBlob);
 
-      recognitionRef.current.onresult = (event) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript + ' ';
-          }
-        }
-        if (finalTranscript) {
-          setTranscript(prev => prev + finalTranscript);
-        }
-      };
+      const response = await fetch('/api/mock-interview/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
 
-      recognitionRef.current.onerror = (event) => {
-        console.warn('Speech recognition error:', event.error);
-        // Don't show error to user for network issues, just continue without transcription
-        if (event.error === 'network') {
-          console.log('Speech recognition unavailable due to network. Continuing without live transcription.');
-        } else if (event.error === 'not-allowed') {
-          setPermissionError('Microphone permission denied. Speech recognition disabled.');
-        }
-      };
-
-      recognitionRef.current.onend = () => {
-        // Auto restart if recording is still in progress
-        if (isRecording && !isPaused) {
-          try {
-            recognitionRef.current?.start();
-          } catch (error) {
-            // Ignore restart errors
-            console.log('Speech recognition restart failed, continuing without transcription');
-          }
-        }
-      };
-    } else {
-      console.log('Speech recognition not supported in this browser');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Transcription successful:', data);
+        setTranscript(data.transcript || '');
+        return data.transcript;
+      } else {
+        console.error('Transcription failed');
+        return '';
+      }
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+      return '';
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
@@ -124,7 +107,7 @@ export default function VoiceRecorder({
         }
       };
 
-      mediaRecorderRef.current.onstop = () => {
+      mediaRecorderRef.current.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
         setAudioBlob(blob);
         setAudioDuration(recordingTime);
@@ -133,15 +116,8 @@ export default function VoiceRecorder({
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
         
-        // Stop speech recognition
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.stop();
-          } catch (error) {
-            // Ignore errors when stopping recognition
-            console.log('Speech recognition stop failed:', error.message);
-          }
-        }
+        // Transcribe the audio using Google Cloud Speech-to-Text
+        await transcribeAudio(blob);
       };
 
       setPermissionError(null);
@@ -162,17 +138,6 @@ export default function VoiceRecorder({
       setAudioBlob(null);
       setTranscript('');
       setAnalysisResult(null);
-      
-      // Setup and start speech recognition (optional)
-      setupSpeechRecognition();
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.start();
-        } catch (error) {
-          console.log('Speech recognition failed to start:', error.message);
-          // Continue without speech recognition
-        }
-      }
       
       mediaRecorderRef.current.start(100); // Collect data every 100ms
       
@@ -217,16 +182,6 @@ export default function VoiceRecorder({
       setIsRecording(false);
       setIsPaused(false);
       clearInterval(intervalRef.current);
-      
-      // Stop speech recognition
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (error) {
-          // Ignore errors when stopping recognition
-          console.log('Speech recognition stop failed:', error.message);
-        }
-      }
     }
   };
 
@@ -589,13 +544,14 @@ export default function VoiceRecorder({
 
             {transcript && (
               <div className="bg-muted/50 rounded p-3">
-                <p className="text-sm"><strong>Live Transcript:</strong> {transcript}</p>
+                <p className="text-sm"><strong>Transcript (Google Cloud Speech-to-Text):</strong> {transcript}</p>
               </div>
             )}
 
-            {isRecording && (
-              <div className="text-xs text-muted-foreground text-center">
-                {transcript ? '✓ Live transcription active' : '⚠ Transcription may be unavailable'}
+            {isTranscribing && (
+              <div className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Transcribing with Google Cloud Speech-to-Text...
               </div>
             )}
           </div>
@@ -612,7 +568,7 @@ export default function VoiceRecorder({
             <li>• Take a moment to think before starting</li>
             <li>• You can pause and resume recording</li>
             <li>• Review your answer before moving on</li>
-            <li>• Live transcription may not work in all browsers</li>
+            <li>• Audio is transcribed using Google Cloud Speech-to-Text</li>
           </ul>
         </div>
 
