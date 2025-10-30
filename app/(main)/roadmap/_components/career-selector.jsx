@@ -162,207 +162,138 @@ const careerCategories = [
 
 export default function CareerSelector({ onCareerSelect }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [loadingCareer, setLoadingCareer] = useState(null);
 
-  const handleCareerSelect = async (career) => {
-    setLoadingCareer(career.id);
-    
-    try {
-      // Generate AI roadmap for the selected career
-      const response = await fetch('/api/roadmap', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ career: career.title }),
+  const handleCareerSelect = (career) => {
+    // Simply pass the career to parent, API call happens there
+    onCareerSelect(career);
+  };
+
+  const handleSearchSubmit = () => {
+    if (searchTerm.trim()) {
+      handleCareerSelect({
+        id: searchTerm.trim().toLowerCase().replace(/\s+/g, '-'),
+        title: searchTerm.trim(),
+        description: `Explore career path for ${searchTerm.trim()}`,
+        skills: [],
+        avgSalary: 'Varies',
+        demand: 'High',
+        icon: Search,
+        isCustomSearch: true
       });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        // Pass the career with AI-generated roadmap data
-        const enhancedCareer = {
-          ...career,
-          aiRoadmap: result.data
-        };
-        onCareerSelect(enhancedCareer);
-      } else {
-        console.error('Failed to generate roadmap:', result.error);
-        // Still proceed with career selection but without AI roadmap
-        onCareerSelect(career);
-      }
-    } catch (error) {
-      console.error('Error generating roadmap:', error);
-      // Still proceed with career selection but without AI roadmap
-      onCareerSelect(career);
-    } finally {
-      setLoadingCareer(null);
     }
   };
 
-  const filteredCategories = careerCategories.map(category => ({
-    ...category,
-    careers: category.careers.filter(career =>
-      career.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      career.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      career.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()))
-    ),
-  })).filter(category => category.careers.length > 0);
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
 
-  const getDemandColor = (demand) => {
-    switch (demand) {
-      case 'Very High': return 'bg-green-100 text-green-800 border-green-200';
-      case 'High': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearchSubmit();
     }
   };
+
+  // Popular career roles for quick access
+  const popularRoles = [
+    'Frontend', 'Backend', 'Full Stack', 'DevOps', 'Data Analyst', 'AI Engineer',
+    'AI and Data Scientist', 'Data Engineer', 'Android', 'Machine Learning',
+    'PostgreSQL', 'iOS', 'Blockchain', 'QA', 'Software Architect',
+    'Cyber Security', 'UX Design', 'Technical Writer', 'Game Developer',
+    'Server Side Game Developer', 'MLOps', 'Product Manager', 'Engineering Manager',
+    'Developer Relations', 'BI Analyst'
+  ];
+
+  // Other career paths outside technology
+  const otherCareers = [
+    'Doctor', 'Nurse', 'Pharmacist', 'Physiotherapist', 'Veterinarian',
+    'Lawyer', 'Chartered Accountant', 'Investment Banker', 'Financial Analyst', 'Civil Engineer',
+    'Mechanical Engineer', 'Architect', 'Interior Designer', 'Fashion Designer', 'Graphic Designer',
+    'Content Writer', 'Journalist', 'Teacher', 'Professor', 'HR Manager',
+    'Marketing Manager', 'Sales Manager', 'Real Estate Agent', 'Chef', 'Photographer',
+    'Film Director', 'Actor', 'Musician', 'Psychologist', 'Social Worker'
+  ];
 
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Search */}
-      <div className="max-w-md mx-auto px-4">
-        <div className="relative">
-          <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search careers, skills, or technologies..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 py-3 text-sm sm:text-base"
-          />
+      <div className="max-w-4xl mx-auto px-4 relative">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search for any career, skill, technology and press Enter"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onKeyDown={handleSearchKeyDown}
+              className="pl-12 py-3 text-sm sm:text-base"
+            />
+          </div>
         </div>
+        
       </div>
 
-      {/* Category Filters */}
-      <div className="flex flex-wrap justify-center gap-2 sm:gap-3 px-4">
-        <Button
-          variant={selectedCategory === null ? "default" : "outline"}
-          onClick={() => setSelectedCategory(null)}
-          className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2"
-          size="sm"
-        >
-          All Categories
-        </Button>
-        {careerCategories.map((category) => {
-          const IconComponent = category.icon;
-          return (
-            <Button
-              key={category.id}
-              variant={selectedCategory === category.id ? "default" : "outline"}
-              onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
-              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2"
-              size="sm"
-            >
-              <IconComponent className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">{category.name}</span>
-              <span className="sm:hidden">{category.name.slice(0, 4)}</span>
-            </Button>
-          );
-        })}
-      </div>
-
-      {/* Career Cards */}
-      <div className="space-y-6 sm:space-y-8 px-4">
-        {filteredCategories
-          .filter(category => selectedCategory === null || category.id === selectedCategory)
-          .map((category) => (
-          <div key={category.id}>
-            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-              <category.icon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
-              <h2 className="text-xl sm:text-2xl font-bold">{category.name}</h2>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {category.careers.map((career) => {
-                const CareerIcon = career.icon;
-                return (
-                  <Card 
-                    key={career.id} 
-                    className="hover:shadow-lg transition-all duration-300 cursor-pointer group"
-                    onClick={() => onCareerSelect(career)}
-                  >
-                    <CardHeader className="p-4 sm:p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2 sm:gap-3 flex-1">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
-                            <CareerIcon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <CardTitle className="text-base sm:text-lg group-hover:text-purple-600 transition-colors leading-tight">
-                              {career.title}
-                            </CardTitle>
-                            <Badge className={`${getDemandColor(career.demand)} mt-1 text-xs`}>
-                              {career.demand} Demand
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
-                      <p className="text-sm sm:text-base text-muted-foreground line-clamp-2">{career.description}</p>
-
-                      <div>
-                        <p className="text-xs sm:text-sm font-medium mb-2">Key Skills:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {career.skills.slice(0, 4).map((skill, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {skill}
-                            </Badge>
-                          ))}
-                          {career.skills.length > 4 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{career.skills.length - 4} more
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t gap-3 sm:gap-0">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Avg. Salary</p>
-                          <p className="text-sm sm:text-base font-semibold text-green-600">{career.avgSalary}</p>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          className="group-hover:bg-purple-600 group-hover:text-white transition-colors w-full sm:w-auto text-xs sm:text-sm"
-                          onClick={() => handleCareerSelect(career)}
-                          disabled={loadingCareer === career.id}
-                        >
-                          {loadingCareer === career.id ? (
-                            <>
-                              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Rocket className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                              View Roadmap
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
+      {/* Popular Role Cards Grid */}
+      <div className="max-w-6xl mx-auto px-4">
+        <h1 className="text-xl text-center text-gray-400 py-6 mb-4 " > Popular Roles </h1>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+          {popularRoles.map((role) => (
+            <Card 
+              key={role}
+              className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer group bg-gradient-to-br from-gray-900/90 to-gray-800/90 border-gray-700/50"
+              onClick={() => handleCareerSelect({ 
+                id: role.toLowerCase().replace(/\s+/g, '-'),
+                title: role,
+                description: `Explore career path for ${role}`,
+                skills: [],
+                avgSalary: 'Varies',
+                demand: 'High',
+                icon: Rocket,
+                isCustomSearch: true
               })}
-            </div>
-          </div>
-        ))}
+            >
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center min-h-[100px]">
+                <Rocket className="h-8 w-8 text-purple-400 mb-2 group-hover:text-purple-300 transition-colors" />
+                <p className="font-medium text-sm text-white group-hover:text-purple-300 transition-colors leading-tight">
+                  {role}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        
+
       </div>
 
-      {filteredCategories.length === 0 && (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-            <Search className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">No careers found</h3>
-          <p className="text-muted-foreground">
-            Try adjusting your search terms or browse all categories
-          </p>
+      {/* Other Career Paths Grid */}
+      <div className="max-w-6xl mx-auto px-4 mt-12">
+        <h1 className="text-xl text-center text-gray-400 py-6 mb-4" > Other Career Paths </h1>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+          {otherCareers.map((career) => (
+            <Card 
+              key={career}
+              className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer group bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700/50"
+              onClick={() => handleCareerSelect({ 
+                id: career.toLowerCase().replace(/\s+/g, '-'),
+                title: career,
+                description: `Explore career path for ${career}`,
+                skills: [],
+                avgSalary: 'Varies',
+                demand: 'High',
+                icon: Rocket,
+                isCustomSearch: true
+              })}
+            >
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center min-h-[100px]">
+                <Rocket className="h-8 w-8 text-blue-400 mb-2 group-hover:text-blue-300 transition-colors" />
+                <p className="font-medium text-sm text-white group-hover:text-blue-300 transition-colors leading-tight">
+                  {career}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
