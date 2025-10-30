@@ -226,7 +226,7 @@ export default function CareerSelector({ onCareerSelect }) {
               value={searchTerm}
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
-              className="pl-12 py-3 text-sm sm:text-base"
+              className="pl-12 py-3 text-sm sm:text-base rounded-full h-16"
             />
           </div>
         </div>
