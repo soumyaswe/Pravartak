@@ -26,6 +26,7 @@
     "deploy:open": "gcloud app browse"
   },
   "dependencies": {
+    "@google-cloud/speech": "^7.2.1",
     "@google/generative-ai": "^0.21.0",
     "@hookform/resolvers": "^3.10.0",
     "@prisma/client": "^6.2.1",

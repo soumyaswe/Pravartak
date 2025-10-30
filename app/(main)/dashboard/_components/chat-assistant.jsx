@@ -6,6 +6,7 @@ import {
   MessageCircle,
   X,
   Send,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,31 @@ const ChatPopup = ({ isOpen, onClose }) => {
   ]);
   const chatRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  // Load chat history from localStorage on component mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem('chatHistory');
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        // Convert timestamp strings back to Date objects
+        const messagesWithDates = parsedMessages.map(msg => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+        setChatMessages(messagesWithDates);
+      } catch (error) {
+        console.error('Error loading chat history:', error);
+      }
+    }
+  }, []);
+
+  // Save chat history to localStorage whenever messages change
+  useEffect(() => {
+    if (chatMessages.length > 1) { // Only save if there are messages beyond the initial greeting
+      localStorage.setItem('chatHistory', JSON.stringify(chatMessages));
+    }
+  }, [chatMessages]);
 
   // Close chat popup when clicking outside
   useEffect(() => {
@@ -63,7 +89,15 @@ const ChatPopup = ({ isOpen, onClose }) => {
       setIsLoading(true);
       
       try {
-        // Call the API
+        // Prepare message history (exclude the initial greeting message)
+        const messageHistory = chatMessages
+          .filter(msg => msg.id !== 1) // Exclude initial assistant greeting
+          .map(msg => ({
+            text: msg.text,
+            sender: msg.sender
+          }));
+
+        // Call the API with full conversation history
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: {
@@ -71,7 +105,8 @@ const ChatPopup = ({ isOpen, onClose }) => {
           },
           body: JSON.stringify({
             message: currentMessage,
-            hasImage: false
+            hasImage: false,
+            messageHistory: messageHistory
           }),
         });
 
@@ -117,6 +152,18 @@ const ChatPopup = ({ isOpen, onClose }) => {
     }
   };
 
+  // Clear chat history
+  const handleClearHistory = () => {
+    const initialMessage = {
+      id: 1,
+      text: "Hi! How can I assist you with your career goals today?",
+      sender: "assistant",
+      timestamp: new Date(),
+    };
+    setChatMessages([initialMessage]);
+    localStorage.removeItem('chatHistory');
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -130,14 +177,25 @@ const ChatPopup = ({ isOpen, onClose }) => {
           <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
           <h3 className="font-semibold text-sm sm:text-base">Career Assistant</h3>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="h-7 w-7 sm:h-8 sm:w-8"
-        >
-          <X className="h-3 w-3 sm:h-4 sm:w-4" />
-        </Button>
+        <div className="flex items-center space-x-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClearHistory}
+            className="h-7 w-7 sm:h-8 sm:w-8"
+            title="Clear chat history"
+          >
+            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-7 w-7 sm:h-8 sm:w-8"
+          >
+            <X className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Chat Messages */}

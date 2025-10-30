@@ -9,7 +9,7 @@ export async function POST(request) {
     const audioFile = formData.get('audio');
     const question = formData.get('question');
     const jobRole = formData.get('jobRole');
-    const transcript = formData.get('transcript'); // In real implementation, you'd use speech-to-text
+    let transcript = formData.get('transcript');
 
     console.log('Analyzing answer for:', { jobRole, hasAudio: !!audioFile, hasTranscript: !!transcript });
 
@@ -30,14 +30,43 @@ export async function POST(request) {
 
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    // For now, we'll simulate speech analysis since we don't have Google Cloud Speech API
-    // In a real implementation, you would:
-    // 1. Convert audio to text using Speech-to-Text API
-    // 2. Analyze speech patterns (WPM, pauses, filler words)
+    // Use Google Cloud Speech-to-Text API for transcription
+    let speechAnalysis = null;
     
-    // Simulated speech analysis (replace with actual implementation)
-    const simulatedAnalysis = analyzeAudioSimulation(audioFile, transcript);
-    console.log('Simulated analysis:', simulatedAnalysis);
+    try {
+      console.log('Calling Google Cloud Speech-to-Text API...');
+      const transcribeFormData = new FormData();
+      transcribeFormData.append('audio', audioFile);
+      
+      const transcribeResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/mock-interview/transcribe`, {
+        method: 'POST',
+        body: transcribeFormData,
+      });
+
+      if (transcribeResponse.ok) {
+        const transcriptionData = await transcribeResponse.json();
+        console.log('Google Cloud Speech API response:', transcriptionData);
+        
+        transcript = transcriptionData.transcript || transcript;
+        speechAnalysis = {
+          transcript: transcriptionData.transcript,
+          confidence: transcriptionData.confidence,
+          wpm: transcriptionData.metrics?.wpm || 0,
+          pauseCount: transcriptionData.metrics?.pauseCount || 0,
+          fillerCount: transcriptionData.metrics?.fillerCount || 0,
+          duration: transcriptionData.metrics?.duration || 0,
+          wordCount: transcriptionData.metrics?.wordCount || 0
+        };
+      } else {
+        console.warn('Google Cloud Speech API failed, using fallback');
+        speechAnalysis = analyzeAudioFallback(audioFile, transcript);
+      }
+    } catch (error) {
+      console.error('Error calling transcription API:', error);
+      speechAnalysis = analyzeAudioFallback(audioFile, transcript);
+    }
+    
+    console.log('Speech analysis:', speechAnalysis);
 
     // Evaluate answer content using Gemini
     const contentPrompt = `
@@ -47,7 +76,13 @@ export async function POST(request) {
       "${question}"
 
       The candidate's transcribed answer is:
-      "${transcript || 'No transcript available - analysis based on audio characteristics'}"
+      "${speechAnalysis.transcript || transcript || 'No transcript available - analysis based on audio characteristics'}"
+
+      Speech Analysis Metrics:
+      - Words per minute: ${speechAnalysis.wpm}
+      - Pause count: ${speechAnalysis.pauseCount}
+      - Filler word count: ${speechAnalysis.fillerCount}
+      - Confidence score: ${(speechAnalysis.confidence * 100).toFixed(1)}%
 
       Please provide your evaluation in a strict JSON format with two keys:
       1. "score": An integer from 1 to 5, where 1 is poor and 5 is excellent.
@@ -59,6 +94,7 @@ export async function POST(request) {
       - Structure and clarity
       - Completeness of the answer
       - Professional language
+      - Speech delivery (pacing, pauses, filler words)
 
       If no transcript is available, focus on encouraging the candidate and provide a neutral score.
 
@@ -91,7 +127,7 @@ export async function POST(request) {
 
     // Combine speech analysis and content evaluation
     const fullReport = {
-      ...simulatedAnalysis,
+      ...speechAnalysis,
       ...contentEvaluation,
       timestamp: new Date().toISOString()
     };
@@ -107,35 +143,36 @@ export async function POST(request) {
   }
 }
 
-// Simulated speech analysis function
-function analyzeAudioSimulation(audioFile, transcript) {
-  // This is a simulation - in real implementation, you'd use Google Cloud Speech API
+// Fallback analysis when Google Cloud Speech API is unavailable
+function analyzeAudioFallback(audioFile, transcript) {
+  console.warn('Using fallback speech analysis');
   const audioSize = audioFile.size;
   const estimatedDuration = Math.max(10, Math.min(300, audioSize / 10000)); // Rough estimation
   
-  // Simulate analysis based on transcript or audio size
+  // Estimate based on transcript or audio size
   const wordCount = transcript ? transcript.split(' ').length : Math.floor(audioSize / 1000);
   const wpm = Math.round((wordCount / estimatedDuration) * 60);
   
-  // Simulate filler words detection
+  // Detect filler words if transcript is available
   const fillerWords = ['um', 'uh', 'like', 'so', 'you know', 'actually', 'basically'];
   const fillerCount = transcript 
     ? fillerWords.reduce((count, filler) => 
         count + (transcript.toLowerCase().split(filler).length - 1), 0)
     : Math.floor(Math.random() * 5);
   
-  // Simulate pause detection
+  // Estimate pause count
   const pauseCount = Math.floor(estimatedDuration / 10) + Math.floor(Math.random() * 3);
   
-  // Simulate confidence score
-  const confidence = 0.8 + (Math.random() * 0.2); // 80-100%
+  // Estimate confidence score
+  const confidence = transcript ? 0.75 : 0.5;
   
   return {
-    transcript: transcript || `[Simulated transcript for ${Math.floor(estimatedDuration)}s audio]`,
+    transcript: transcript || `[Fallback: Transcript unavailable for ${Math.floor(estimatedDuration)}s audio]`,
     wpm: Math.max(60, Math.min(200, wpm)),
     pauseCount,
     fillerCount,
     confidence,
-    duration: estimatedDuration
+    duration: estimatedDuration,
+    wordCount
   };
 }
