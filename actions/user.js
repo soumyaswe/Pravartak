@@ -13,54 +13,55 @@ export async function updateUser(data) {
       throw new Error("User not found");
     }
 
-    // Start a transaction to handle both operations
-    const result = await db.$transaction(
-      async (tx) => {
-        // First check if industry exists
-        let industryInsight = await tx.industryInsight.findUnique({
-          where: {
-            industry: data.industry,
-          },
-        });
+    console.log("Updating user with data:", data);
 
-        // If industry doesn't exist, create it with default values
-        if (!industryInsight) {
-          const insights = await generateAIInsights(data.industry);
+    // First, just update the user without transaction
+    const updatedUser = await db.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        industry: data.industry,
+        experience: data.experience,
+        bio: data.bio,
+        skills: data.skills,
+      },
+    });
 
-          industryInsight = await db.industryInsight.create({
-            data: {
-              industry: data.industry,
-              ...insights,
-              nextUpdate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-            },
-          });
-        }
+    console.log("User updated successfully:", updatedUser.id);
 
-        // Now update the user
-        const updatedUser = await tx.user.update({
-          where: {
-            id: user.id,
-          },
+    // Then handle industry insights separately (non-blocking)
+    try {
+      let industryInsight = await db.industryInsight.findUnique({
+        where: {
+          industry: data.industry,
+        },
+      });
+
+      if (!industryInsight) {
+        console.log("Creating new industry insight for:", data.industry);
+        const insights = await generateAIInsights(data.industry);
+
+        await db.industryInsight.create({
           data: {
             industry: data.industry,
-            experience: data.experience,
-            bio: data.bio,
-            skills: data.skills,
+            ...insights,
+            nextUpdate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           },
         });
-
-        return { updatedUser, industryInsight };
-      },
-      {
-        timeout: 10000,
       }
-    );
+    } catch (insightError) {
+      console.error("Error with industry insights (non-critical):", insightError);
+      // Don't fail the update if industry insights fail
+    }
 
-    revalidatePath("/");
-    return result.updatedUser;
+    revalidatePath("/profile");
+    revalidatePath("/dashboard");
+    return updatedUser;
   } catch (error) {
-    console.error("Error updating user and industry:", error.message);
-    throw new Error("Failed to update profile");
+    console.error("Error updating user:", error);
+    console.error("Error stack:", error.stack);
+    throw new Error(error.message || "Failed to update profile");
   }
 }
 

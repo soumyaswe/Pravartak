@@ -59,7 +59,7 @@ export default function ProfileView() {
     data: profileData,
   } = useFetch(getUserProfile);
 
-  const { loading: updatingProfile, fn: updateProfileFn } =
+  const { loading: updatingProfile, fn: updateProfileFn, data: updateResult } =
     useFetch(updateUser);
 
   const {
@@ -109,12 +109,19 @@ export default function ProfileView() {
         skills: skillsArray,
       };
 
-      await updateProfileFn(updateData);
-      toast.success("Profile updated successfully!");
-      setIsEditing(false);
-      // Reload profile data
-      await getProfileFn();
+      const result = await updateProfileFn(updateData);
+      
+      if (result) {
+        toast.success("Profile updated successfully!");
+        setIsEditing(false);
+        setEditingSection(null);
+        // Reload profile data to show updated values
+        await getProfileFn();
+      } else {
+        throw new Error("Failed to update profile");
+      }
     } catch (error) {
+      console.error("Update error:", error);
       toast.error(error.message || "Failed to update profile");
     }
   };
@@ -276,7 +283,7 @@ export default function ProfileView() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-20 ">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 lg:gap-12">
               {/* Industry */}
               <div className="space-y-2">
                 <Label htmlFor="industry">
@@ -317,7 +324,7 @@ export default function ProfileView() {
                     )}
                   </>
                 ) : (
-                  <div className="p-3 border rounded-md bg-muted/50 w-[670px]">
+                  <div className="p-3 border rounded-md bg-muted/50">
                     <p className="font-medium">{industryDetails.name}</p>
                     {industryDetails.subIndustry && (
                       <p className="text-sm text-muted-foreground capitalize">
@@ -340,6 +347,7 @@ export default function ProfileView() {
                       type="number"
                       min="0"
                       placeholder="Enter years of experience"
+                      className="w-[30%]"
                       {...register("experience")}
                     />
                     {errors.experience && (
@@ -349,7 +357,7 @@ export default function ProfileView() {
                     )}
                   </>
                 ) : (
-                  <div className="p-3 border rounded-md bg-muted/50 w-[300px]">
+                  <div className="p-3 border rounded-md bg-muted/50 w-[30%]">
                     <p className="font-medium">
                       {profileData.experience || 0} years
                     </p>
