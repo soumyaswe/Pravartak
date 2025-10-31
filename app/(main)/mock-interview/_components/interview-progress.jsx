@@ -22,7 +22,9 @@ export default function InterviewProgress({
   onNext, 
   canGoPrevious, 
   canGoNext,
-  jobRole 
+  jobRole,
+  answeredQuestions = {},
+  onQuestionSelect
 }) {
   const [sessionTime, setSessionTime] = useState(0);
 
@@ -48,121 +50,64 @@ export default function InterviewProgress({
   };
 
   return (
-    <Card className="w-full">
+    <Card className="w-full h-fit">
       <CardContent className="p-4 md:p-6">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="space-y-4 mb-6">
           <div className="space-y-1">
-            <h2 className="text-xl font-semibold">
-              Question {currentQuestion} of {totalQuestions}
-            </h2>
-            <p className="text-muted-foreground">
+            
+            <h2 className="text-lg font-bold ">
               {jobRole ? `Mock Interview for ${jobRole}` : 'Mock Interview Session'}
-            </p>
+            </h2>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Timer className="h-4 w-4" />
-              <span>Session: {formatTime(sessionTime)}</span>
-            </div>
-            <Badge variant="outline" className="px-3">
-              {Math.round(progress)}% Complete
-            </Badge>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="space-y-2 mb-6">
-          <Progress value={progress} className="h-2" />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Started</span>
-            <span>{currentQuestion} / {totalQuestions}</span>
-            <span>Complete</span>
-          </div>
-        </div>
-
-        {/* Question Dots Navigation */}
-        <div className="flex items-center justify-center gap-2 mb-6 flex-wrap">
-          {Array.from({ length: totalQuestions }, (_, index) => {
-            const status = getQuestionStatus(index);
-            return (
-              <div 
-                key={index}
-                className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium transition-colors ${
-                  status === 'completed' 
-                    ? 'bg-green-500 text-white' 
-                    : status === 'current'
-                    ? 'bg-primary text-primary-foreground ring-2 ring-primary/20'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {status === 'completed' ? (
-                  <CheckCircle className="h-4 w-4" />
-                ) : (
-                  <span>{index + 1}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Navigation Controls */}
-        <div className="flex items-center justify-between gap-4">
-          <Button 
-            onClick={onPrevious}
-            disabled={!canGoPrevious}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Previous</span>
-          </Button>
-
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">Take your time</span>
-          </div>
-
-          <Button 
-            onClick={onNext}
-            disabled={!canGoNext}
-            className="flex items-center gap-2"
-          >
-            <span className="hidden sm:inline">
-              {currentQuestion === totalQuestions ? 'Finish' : 'Next'}
-            </span>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Progress Statistics */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
-          <div className="text-center">
-            <div className="text-lg font-semibold text-green-600">
-              {currentQuestion - 1}
-            </div>
-            <div className="text-xs text-muted-foreground">Completed</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-blue-600">
-              1
-            </div>
-            <div className="text-xs text-muted-foreground">Current</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-gray-500">
-              {totalQuestions - currentQuestion}
-            </div>
-            <div className="text-xs text-muted-foreground">Remaining</div>
+            <Timer className="h-4 w-4" />
+            <span>Session: {formatTime(sessionTime)}</span>
           </div>
         </div>
 
-        {/* Quick Tips for Mobile */}
-        <div className="md:hidden mt-4 p-3 bg-muted/50 rounded-lg">
-          <p className="text-xs text-muted-foreground text-center">
-            💡 Tip: Rotate your device to landscape for a better experience
-          </p>
+        {/* Question Navigation Palette */}
+        <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+          <div className="space-y-2">
+            <span className="font-medium text-base">Question Navigation</span>
+            <div className="flex items-center justify-between gap-2 text-sm mb-10 py-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span>Answered</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span>Not Answered</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-5 gap-2">
+            {Array.from({ length: totalQuestions }, (_, index) => {
+              const qNum = index + 1;
+              const isAnswered = answeredQuestions[index] || answeredQuestions[qNum];
+              const isCurrent = qNum === currentQuestion;
+              
+              return (
+                <button
+                  key={qNum}
+                  onClick={() => onQuestionSelect && onQuestionSelect(index)}
+                  className={`
+                    w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm
+                    transition-all border-2
+                    ${isAnswered 
+                      ? 'bg-green-500 border-green-600 text-white hover:bg-green-600' 
+                      : 'bg-red-500 border-red-600 text-white hover:bg-red-600'
+                    }
+                    ${isCurrent ? 'border-2 border-white' : 'hover:scale-105'}
+                  `}
+                >
+                  {qNum}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -25,10 +25,10 @@ export default function VoiceRecorder({
   questionId, 
   timeLimit, 
   onSaveAnswer, 
-  existingAnswer, 
-  onNext,
+  existingAnswer,
   currentQuestion,
-  jobRole
+  jobRole,
+  onAnalysisComplete
 }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -48,6 +48,7 @@ export default function VoiceRecorder({
   const audioRef = useRef(null);
   const intervalRef = useRef(null);
   const chunksRef = useRef([]);
+  const recordedDurationRef = useRef(0);
 
   // Format time in MM:SS format
   const formatTime = (seconds) => {
@@ -109,8 +110,9 @@ export default function VoiceRecorder({
 
       mediaRecorderRef.current.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
+        const duration = recordedDurationRef.current;
         setAudioBlob(blob);
-        setAudioDuration(recordingTime);
+        setAudioDuration(duration);
         chunksRef.current = [];
         
         // Stop all tracks
@@ -143,11 +145,13 @@ export default function VoiceRecorder({
       
       intervalRef.current = setInterval(() => {
         setRecordingTime(prev => {
-          if (prev >= timeLimit) {
+          const newTime = prev + 1;
+          recordedDurationRef.current = newTime;
+          if (newTime >= timeLimit) {
             stopRecording();
-            return prev;
+            return newTime;
           }
-          return prev + 1;
+          return newTime;
         });
       }, 1000);
     }
@@ -160,11 +164,13 @@ export default function VoiceRecorder({
         mediaRecorderRef.current.resume();
         intervalRef.current = setInterval(() => {
           setRecordingTime(prev => {
-            if (prev >= timeLimit) {
+            const newTime = prev + 1;
+            recordedDurationRef.current = newTime;
+            if (newTime >= timeLimit) {
               stopRecording();
-              return prev;
+              return newTime;
             }
-            return prev + 1;
+            return newTime;
           });
         }, 1000);
       } else {
@@ -181,6 +187,7 @@ export default function VoiceRecorder({
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setIsPaused(false);
+      setPlaybackTime(0); // Reset playback position to start
       clearInterval(intervalRef.current);
     }
   };
@@ -218,6 +225,9 @@ export default function VoiceRecorder({
 
       if (response.ok) {
         setAnalysisResult(data);
+        if (onAnalysisComplete) {
+          onAnalysisComplete(data);
+        }
         return data;
       } else {
         console.error('Analysis failed:', data.error);
@@ -281,12 +291,6 @@ export default function VoiceRecorder({
     }
   };
 
-  // Save and continue to next question
-  const saveAndNext = async () => {
-    await saveAnswer();
-    setTimeout(() => onNext(), 500);
-  };
-
   // Analyze current answer
   const handleAnalyze = async () => {
     if (audioBlob && !analysisResult) {
@@ -294,10 +298,33 @@ export default function VoiceRecorder({
     }
   };
 
-  // Skip question
-  const skipQuestion = () => {
-    onNext();
-  };
+  // Reset state when question changes
+  useEffect(() => {
+    // Reset all states when moving to a new question
+    setIsRecording(false);
+    setIsPaused(false);
+    setRecordingTime(0);
+    setAudioBlob(null);
+    setIsPlaying(false);
+    setPlaybackTime(0);
+    setAudioDuration(0);
+    setIsProcessing(false);
+    setIsAnalyzing(false);
+    setAnalysisResult(null);
+    setTranscript('');
+    setIsTranscribing(false);
+    recordedDurationRef.current = 0;
+    
+    // Clear any ongoing intervals
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    
+    // Stop any ongoing recording
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, [questionId]);
 
   // Cleanup on component unmount
   useEffect(() => {
@@ -317,10 +344,6 @@ export default function VoiceRecorder({
       const url = URL.createObjectURL(audioBlob);
       audioRef.current.src = url;
       
-      audioRef.current.onloadedmetadata = () => {
-        setAudioDuration(audioRef.current.duration);
-      };
-      
       audioRef.current.ontimeupdate = () => {
         setPlaybackTime(audioRef.current.currentTime);
       };
@@ -339,7 +362,7 @@ export default function VoiceRecorder({
   const timeRemaining = timeLimit - recordingTime;
 
   return (
-    <Card className="h-full">
+    <Card className="h-fit">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Mic className="h-5 w-5" />
@@ -489,88 +512,20 @@ export default function VoiceRecorder({
                 )}
 
                 <Button 
-                  onClick={saveAndNext}
+                  onClick={saveAnswer}
                   className="w-full h-12"
                   disabled={isProcessing}
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  {isProcessing ? 'Saving...' : 'Save & Next Question'}
-                </Button>
-                <Button 
-                  onClick={skipQuestion}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <SkipForward className="mr-2 h-4 w-4" />
-                  Skip Question
+                  {isProcessing ? 'Saving...' : 'Save Answer'}
                 </Button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Analysis Results */}
-        {analysisResult && (
-          <div className="space-y-3">
-            <h4 className="font-medium text-sm flex items-center gap-2">
-              <Brain className="h-4 w-4 text-purple-500" />
-              AI Analysis Results
-            </h4>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-blue-50 dark:bg-blue-950/20 rounded p-3 text-center">
-                <div className="text-lg font-bold text-blue-600">{analysisResult.score}/5</div>
-                <div className="text-xs text-muted-foreground">Content Score</div>
-              </div>
-              <div className="bg-green-50 dark:bg-green-950/20 rounded p-3 text-center">
-                <div className="text-lg font-bold text-green-600">{analysisResult.wpm}</div>
-                <div className="text-xs text-muted-foreground">Words/Min</div>
-              </div>
-              <div className="bg-orange-50 dark:bg-orange-950/20 rounded p-3 text-center">
-                <div className="text-lg font-bold text-orange-600">{analysisResult.pauseCount}</div>
-                <div className="text-xs text-muted-foreground">Pauses</div>
-              </div>
-              <div className="bg-purple-50 dark:bg-purple-950/20 rounded p-3 text-center">
-                <div className="text-lg font-bold text-purple-600">{analysisResult.fillerCount}</div>
-                <div className="text-xs text-muted-foreground">Fillers</div>
-              </div>
-            </div>
-
-            {analysisResult.justification && (
-              <div className="bg-muted/50 rounded p-3">
-                <p className="text-sm"><strong>Feedback:</strong> {analysisResult.justification}</p>
-              </div>
-            )}
-
-            {transcript && (
-              <div className="bg-muted/50 rounded p-3">
-                <p className="text-sm"><strong>Transcript (Google Cloud Speech-to-Text):</strong> {transcript}</p>
-              </div>
-            )}
-
-            {isTranscribing && (
-              <div className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Transcribing with Google Cloud Speech-to-Text...
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Audio Element */}
         <audio ref={audioRef} className="hidden" />
-
-        {/* Tips */}
-        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-          <h4 className="font-medium text-sm">Recording Tips:</h4>
-          <ul className="text-xs text-muted-foreground space-y-1">
-            <li>• Speak clearly and at a moderate pace</li>
-            <li>• Take a moment to think before starting</li>
-            <li>• You can pause and resume recording</li>
-            <li>• Review your answer before moving on</li>
-            <li>• Audio is transcribed using Google Cloud Speech-to-Text</li>
-          </ul>
-        </div>
 
         {/* Status Indicators */}
         <div className="flex justify-between text-xs text-muted-foreground">
