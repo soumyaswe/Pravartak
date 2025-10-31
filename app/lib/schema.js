@@ -56,6 +56,45 @@ export const entrySchema = z
     }
   );
 
+// Updated resume schema for new builder
+export const newResumeSchema = z.object({
+  contacts: z.object({
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    jobTitle: z.string().min(1, 'Job title is required'),
+    phone: z.string().min(1, 'Phone is required'),
+    email: z.string().email('Invalid email address'),
+    linkedin: z.string().url('Invalid URL').optional().or(z.literal('')),
+    github: z.string().url('Invalid URL').optional().or(z.literal('')),
+  }),
+  experience: z.array(z.object({
+    id: z.string().optional(),
+    jobTitle: z.string().min(1, 'Job title is required'),
+    company: z.string().min(1, 'Company is required'),
+    location: z.string().optional(),
+    startDate: z.string().min(1, 'Start date is required'),
+    endDate: z.string().optional(),
+    description: z.string().min(1, 'Description is required'),
+  })),
+  education: z.array(z.object({
+    id: z.string().optional(),
+    institution: z.string().min(1, 'Institution is required'),
+    degree: z.string().min(1, 'Degree is required'),
+    fieldOfStudy: z.string().optional(),
+    startDate: z.string().min(1, 'Start date is required'),
+    endDate: z.string().optional(),
+    description: z.string().optional(),
+  })),
+  skills: z.array(z.object({
+    id: z.string().optional(),
+    name: z.string().min(1, 'Skill name is required'),
+    level: z.enum(['Beginner', 'Intermediate', 'Advanced', 'Expert']),
+  })),
+  summary: z.object({
+    summary: z.string().min(20, 'Summary should be at least 20 characters'),
+  }),
+});
+
 export const resumeSchema = z.object({
   contactInfo: contactSchema,
   summary: z.string().min(1, "Professional summary is required"),

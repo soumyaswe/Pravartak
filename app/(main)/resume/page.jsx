@@ -1,16 +1,21 @@
-import { getResume } from "@/actions/resume";
-import ResumeBuilder from "./_components/resume-builder";
+import { getResumes } from "@/actions/resume";
+import ResumeOptions from "./_components/resume-options.jsx";
 
 export const dynamic = 'force-dynamic';
 
-export default async function ResumePage({ searchParams }) {
-  // If resumeId is provided, we could load that specific resume
-  // For now, just load the latest resume
-  const resume = await getResume();
+export default async function ResumePage() {
+  // Get all user's resumes to show existing ones
+  let existingResumes = [];
+  try {
+    existingResumes = await getResumes();
+  } catch (error) {
+    console.error("Error fetching resumes:", error);
+    // Don't block the page if there's an error
+  }
 
   return (
     <div className="container mx-auto py-6">
-      <ResumeBuilder initialResume={resume} />
+      <ResumeOptions existingResumes={existingResumes} />
     </div>
   );
 }
