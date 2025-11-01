@@ -41,18 +41,31 @@ export default function RoadmapModal({ isOpen, onClose, node }) {
     if (!node.contentFile) return '';
     
     try {
+      // Configure custom renderer for links
+      const renderer = new marked.Renderer();
+      const originalLinkRenderer = renderer.link.bind(renderer);
+      
+      // Override link rendering to add target="_blank" and rel attributes
+      renderer.link = (href, title, text) => {
+        const html = originalLinkRenderer(href, title, text);
+        return html.replace(/^<a /, '<a target="_blank" rel="noopener noreferrer" ');
+      };
+
       // Configure marked for better rendering
       marked.setOptions({
         breaks: true,
         gfm: true,
         headerIds: false,
+        renderer: renderer,
       });
 
       // Convert markdown to HTML
       const rawHtml = marked.parse(node.contentFile);
       
-      // Sanitize HTML to prevent XSS
-      const cleanHtml = DOMPurify.sanitize(rawHtml);
+      // Sanitize HTML to prevent XSS (allow target and rel attributes)
+      const cleanHtml = DOMPurify.sanitize(rawHtml, {
+        ADD_ATTR: ['target', 'rel']
+      });
       
       return cleanHtml;
     } catch (error) {
@@ -174,16 +187,28 @@ export default function RoadmapModal({ isOpen, onClose, node }) {
         .markdown-content ul, .markdown-content ol {
           margin-bottom: 1rem;
           padding-left: 1.5rem;
+          list-style-position: outside;
         }
 
         .markdown-content li {
           margin-bottom: 0.5rem;
           color: #4b5563;
+          padding-left: 0.25rem;
+        }
+
+        .markdown-content li a {
+          display: inline-block;
+          margin-left: 0.25rem;
         }
 
         .markdown-content strong {
           font-weight: 600;
           color: #1f2937;
+        }
+
+        /* Special styling for Resources section */
+        .markdown-content strong:has(+ ul) {
+          color: #7c3aed;
         }
 
         .markdown-content code {
@@ -216,13 +241,29 @@ export default function RoadmapModal({ isOpen, onClose, node }) {
           font-style: italic;
         }
 
-        .markdown-content a {
-          color: #a855f7;
-          text-decoration: underline;
+        /* Resource link styles - Override prose defaults */
+        .markdown-content a,
+        .prose a,
+        .prose-sm a,
+        .prose-lg a {
+          color: #2563eb !important;
+          text-decoration: none !important;
+          font-weight: 500 !important;
+          transition: all 0.2s ease !important;
+          border-bottom: 1px solid transparent !important;
+          padding: 2px 4px !important;
+          border-radius: 4px !important;
         }
 
-        .markdown-content a:hover {
-          color: #7c3aed;
+        .markdown-content a:hover,
+        .prose a:hover,
+        .prose-sm a:hover,
+        .prose-lg a:hover {
+          color: #1d4ed8 !important;
+          background-color: #dbeafe !important;
+          border-bottom: 1px solid #1d4ed8 !important;
+          transform: translateY(-1px) !important;
+          box-shadow: 0 2px 4px rgba(37, 99, 235, 0.15) !important;
         }
 
         /* Dark mode styles */
@@ -249,6 +290,25 @@ export default function RoadmapModal({ isOpen, onClose, node }) {
 
           .markdown-content blockquote {
             color: #9ca3af;
+          }
+
+          /* Dark mode resource links - Override prose defaults */
+          .markdown-content a,
+          .dark .prose a,
+          .dark .prose-sm a,
+          .dark .prose-lg a {
+            color: #60a5fa !important;
+          }
+
+          .markdown-content a:hover,
+          .dark .prose a:hover,
+          .dark .prose-sm a:hover,
+          .dark .prose-lg a:hover {
+            color: #93c5fd !important;
+            background-color: #1e3a5f !important;
+            border-bottom-color: #93c5fd !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 2px 4px rgba(96, 165, 250, 0.2) !important;
           }
         }
 
