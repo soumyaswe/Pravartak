@@ -39,6 +39,11 @@ adminkey.json
 *-service-account-key.json
 firebase-adminsdk-*.json
 
+# Google Cloud Platform credentials (NEVER commit these!)
+backend/gcp-credentials.json
+gcp-credentials.json
+*-credentials.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
