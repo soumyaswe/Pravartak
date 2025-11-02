@@ -23,13 +23,61 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
 import { useAuth } from "@/contexts/auth-context";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
+  const pathname = usePathname();
+  
+  // Check if we're on a dashboard page
+  const isDashboardPage = pathname?.startsWith('/dashboard') || 
+                         pathname?.startsWith('/resume') || 
+                         pathname?.startsWith('/ai-cover-letter') ||
+                         pathname?.startsWith('/cv-analyser') ||
+                         pathname?.startsWith('/interview') ||
+                         pathname?.startsWith('/mock-interview') ||
+                         pathname?.startsWith('/industry-insights') ||
+                         pathname?.startsWith('/roadmap') ||
+                         pathname?.startsWith('/analytics');
+  
+  // Get sidebar state from localStorage (synced across components)
+  const [sidebarExpanded, setSidebarExpanded] = React.useState(true);
+  
+  React.useEffect(() => {
+    // Read initial state from localStorage
+    const stored = localStorage.getItem('sidebar-expanded');
+    if (stored !== null) {
+      setSidebarExpanded(stored === 'true');
+    }
+    
+    // Listen for storage changes (when sidebar toggles in other components)
+    const handleStorageChange = (e) => {
+      if (e.key === 'sidebar-expanded') {
+        setSidebarExpanded(e.newValue === 'true');
+      }
+    };
+    
+    // Custom event for same-tab updates
+    const handleSidebarToggle = (e) => {
+      setSidebarExpanded(e.detail.isExpanded);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('sidebar-toggle', handleSidebarToggle);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sidebar-toggle', handleSidebarToggle);
+    };
+  }, []);
 
   if (loading) {
     return (
-      <header className="fixed top-0 w-full border-b border-border/20 bg-background/60 backdrop-blur-xl z-50 supports-[backdrop-filter]:bg-background/40">
+      <header className={cn(
+        "fixed top-0 border-b border-border/20 bg-background/60 backdrop-blur-xl z-40 supports-[backdrop-filter]:bg-background/40 transition-all duration-300",
+        isDashboardPage ? (sidebarExpanded ? "left-0 md:left-64 right-0" : "left-0 md:left-20 right-0") : "left-0 right-0 w-full"
+      )}>
         <nav className="container mx-auto px-6 h-20 flex items-center justify-between">
           <div className="ml-16 md:ml-20">
             <Link href="/">
@@ -51,7 +99,10 @@ export default function Header() {
   }
 
   return (
-    <header className="fixed top-0 w-full border-b border-border/20 bg-background/60 backdrop-blur-xl z-50 supports-[backdrop-filter]:bg-background/40">
+    <header className={cn(
+      "fixed top-0 border-b border-border/20 bg-background/60 backdrop-blur-xl z-40 supports-[backdrop-filter]:bg-background/40 transition-all duration-300",
+      isDashboardPage ? (sidebarExpanded ? "left-0 md:left-64 right-0" : "left-0 md:left-20 right-0") : "left-0 right-0 w-full"
+    )}>
       <nav className="container mx-auto px-3 h-20 flex items-center justify-between">
         <div>
           <Link href="/">

@@ -51,7 +51,9 @@ export const AuthProvider = ({ children }) => {
           console.log("Setting firebase-token cookie, token length:", idToken.length);
           
           // Set cookies with proper configuration
-          const cookieOptions = `path=/; max-age=${60 * 60}; SameSite=Lax; Secure`;
+          // Remove Secure flag for development (http://localhost)
+          const isSecure = window.location.protocol === 'https:';
+          const cookieOptions = `path=/; max-age=${60 * 60}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
           document.cookie = `firebase-token=${encodeURIComponent(idToken)}; ${cookieOptions}`;
           
           // Also set user data cookie
@@ -64,13 +66,24 @@ export const AuthProvider = ({ children }) => {
           console.log("Setting firebase-user cookie for user:", userData.uid);
           document.cookie = `firebase-user=${encodeURIComponent(JSON.stringify(userData))}; ${cookieOptions}`;
           
+          // Small delay to ensure cookies are persisted before any server calls
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           // Verify cookies were set
           const cookies = document.cookie;
-          console.log("Cookies after setting:", {
-            hasFirebaseUser: cookies.includes('firebase-user'),
-            hasFirebaseToken: cookies.includes('firebase-token'),
-            allCookies: cookies
-          });
+          const hasCookies = cookies.includes('firebase-user') && cookies.includes('firebase-token');
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Auth cookies set:", {
+              hasFirebaseUser: cookies.includes('firebase-user'),
+              hasFirebaseToken: cookies.includes('firebase-token')
+            });
+          }
+          
+          // If cookies are not set, try alternative storage
+          if (!hasCookies) {
+            console.warn("Cookies not persisting, this may cause authentication issues");
+          }
         } catch (error) {
           console.error('Error checking user:', error);
           setUser(firebaseUser); // Still set user even if database check fails

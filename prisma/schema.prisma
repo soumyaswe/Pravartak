@@ -14,7 +14,6 @@ model User {
   name          String?
   imageUrl      String?
   industry      String?    // Combined industry-subindustry (e.g., "tech-software-development")
-  industryInsight IndustryInsight? @relation(fields: [industry], references: [industry])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -125,9 +124,6 @@ enum CoverLetterStatus {
 model IndustryInsight {
   id            String    @id @default(cuid())
   industry      String    @unique  // The industry this data belongs to (e.g., "tech-software-development")
-  
-  // Users in this industry
-  users         User[]
   
   // Salary data
   salaryRanges  Json[]    // Array of { role: string, min: float, max: float, median: float, location: string? }

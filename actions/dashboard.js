@@ -4,7 +4,7 @@ import { db } from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 export const generateAIInsights = async (industry) => {
@@ -40,34 +40,55 @@ export async function getIndustryInsights() {
   try {
     const user = await getAuthenticatedUser();
 
-    // Get user with industry insights
-    const userWithInsights = await db.user.findUnique({
-      where: { firebaseUserId: user.firebaseUserId },
-      include: {
-        industryInsight: true,
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user's industry directly
+    const userWithIndustry = await db.user.findUnique({
+      where: { id: user.id },
+      select: {
+        industry: true,
       },
     });
 
-    if (!userWithInsights) throw new Error("User not found");
-
-    // If no insights exist, generate them
-    if (!userWithInsights.industryInsight && userWithInsights.industry) {
-      const insights = await generateAIInsights(userWithInsights.industry);
-
-      const industryInsight = await db.industryInsight.create({
-        data: {
-          industry: userWithInsights.industry,
-          ...insights,
-          nextUpdate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-      });
-
-      return industryInsight;
+    if (!userWithIndustry || !userWithIndustry.industry) {
+      console.log("User has no industry set");
+      return null; // Return null instead of throwing - user might not have completed profile
     }
 
-    return userWithInsights.industryInsight;
+    // Check if industry insight exists
+    let industryInsight = await db.industryInsight.findUnique({
+      where: {
+        industry: userWithIndustry.industry,
+      },
+    });
+
+    // If no insights exist, generate them
+    if (!industryInsight) {
+      console.log("Generating new industry insights for:", userWithIndustry.industry);
+      
+      try {
+        const insights = await generateAIInsights(userWithIndustry.industry);
+
+        industryInsight = await db.industryInsight.create({
+          data: {
+            industry: userWithIndustry.industry,
+            ...insights,
+            nextUpdate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        });
+      } catch (aiError) {
+        console.error("Error generating AI insights:", aiError);
+        // Return null instead of throwing - page can handle missing insights
+        return null;
+      }
+    }
+
+    return industryInsight;
   } catch (error) {
     console.error("Error in getIndustryInsights:", error);
-    throw new Error("Failed to get industry insights");
+    // Return null instead of throwing to prevent page crash
+    return null;
   }
 }

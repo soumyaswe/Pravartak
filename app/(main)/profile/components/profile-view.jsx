@@ -109,7 +109,9 @@ export default function ProfileView() {
         skills: skillsArray,
       };
 
+      console.log("Submitting profile update:", updateData);
       const result = await updateProfileFn(updateData);
+      console.log("Update result:", result);
       
       if (result) {
         toast.success("Profile updated successfully!");
@@ -118,11 +120,11 @@ export default function ProfileView() {
         // Reload profile data to show updated values
         await getProfileFn();
       } else {
-        throw new Error("Failed to update profile");
+        toast.error("Failed to update profile - no result returned");
       }
     } catch (error) {
       console.error("Update error:", error);
-      toast.error(error.message || "Failed to update profile");
+      // Error toast is already shown by useFetch hook
     }
   };
 
@@ -407,7 +409,11 @@ export default function ProfileView() {
                   <X className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updatingProfile}>
+                <Button 
+                  type="submit" 
+                  disabled={updatingProfile}
+                  onClick={() => console.log("Save button clicked - Professional section")}
+                >
                   {updatingProfile ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -503,7 +509,11 @@ export default function ProfileView() {
                   <X className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updatingProfile}>
+                <Button 
+                  type="submit" 
+                  disabled={updatingProfile}
+                  onClick={() => console.log("Save button clicked - Skills section")}
+                >
                   {updatingProfile ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

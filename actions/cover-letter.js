@@ -4,6 +4,7 @@ import { db } from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { revalidatePath } from "next/cache";
+import { calculateProfileProgress } from "./profile-progress";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -72,6 +73,15 @@ export async function generateCoverLetter(data) {
         userId: user.id,
       },
     });
+
+    revalidatePath("/dashboard");
+    
+    // Recalculate profile progress
+    try {
+      await calculateProfileProgress();
+    } catch (error) {
+      console.error("Error calculating profile progress:", error);
+    }
 
     return coverLetter;
   } catch (error) {
