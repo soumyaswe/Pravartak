@@ -8,6 +8,7 @@ import {
   Mail,
   Search,
   MessageCircle,
+  Mic,
   Video,
   TrendingUp,
   Map,
@@ -43,7 +44,7 @@ const dashboardNavigation = [
     section: "Interview Prep",
     items: [
       { name: "Practice Questions", icon: MessageCircle, href: "/interview" },
-      { name: "Mock Interviews", icon: Video, href: "/mock-interview" },
+      { name: "Mock Interviews", icon: Mic, href: "/mock-interview" },
       { name: "Interview Simulator", icon: Video, href: "/interview-simulator" }
     ]
   },
@@ -67,11 +68,11 @@ export default function DashboardSidebar() {
 
   return (
     <>
-      {/* Mobile hamburger button */}
+      {/* Mobile hamburger button - positioned below header */}
       <Button
         variant="ghost"
         size="sm"
-        className="fixed top-4 left-4 z-50 md:hidden bg-card hover:bg-muted border border-border text-foreground"
+        className="fixed top-24 left-4 z-50 md:hidden bg-card hover:bg-muted border border-border text-foreground"
         onClick={toggleMobile}
       >
         {isMobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -88,44 +89,50 @@ export default function DashboardSidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-full bg-card border-r border-border transition-all duration-300 z-50',
+          'fixed left-0 top-20 h-[calc(100vh-5rem)] bg-card border-r border-border transition-all duration-300 z-40',
           // Desktop behavior
           'hidden md:flex flex-col',
           isExpanded ? 'w-64' : 'w-20',
           // Mobile behavior
           'md:translate-x-0',
-          isMobileOpen ? 'flex w-64 translate-x-0' : 'md:flex -translate-x-full'
+          isMobileOpen ? 'flex w-64 translate-x-0 top-0 h-full' : 'md:flex -translate-x-full'
         )}
       >
-        {/* Header */}
-        <div className="flex items-center justify-end p-4 border-b border-border">
-          {/* Desktop toggle button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="hidden md:flex text-muted-foreground hover:text-foreground"
-            onClick={toggleExpanded}
-          >
-            {isExpanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-        </div>
-
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-6">
+        <nav className="flex-1 p-3 space-y-3 overflow-y-auto">
           {dashboardNavigation.map((section, sectionIndex) => (
             <div key={sectionIndex}>
-              {/* Section Header */}
+              {/* Section Header with Toggle Button (only for Overview) */}
               <div className={cn(
-                'px-3 mb-2 transition-opacity duration-300',
-                !isExpanded && 'md:opacity-0 md:h-0 md:overflow-hidden'
+                'px-2 mb-1 flex items-center justify-between',
+                !isExpanded && sectionIndex !== 0 && 'md:opacity-0 md:h-0 md:overflow-hidden'
               )}>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <h3 className={cn(
+                  'text-[11px] font-semibold text-muted-foreground uppercase tracking-wider',
+                  !isExpanded && 'md:opacity-0 md:w-0 md:overflow-hidden'
+                )}>
                   {section.section}
                 </h3>
+                
+                {/* Toggle button beside Overview */}
+                {sectionIndex === 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'hidden md:flex h-5 w-5 p-0 text-muted-foreground hover:text-foreground hover:bg-muted',
+                      !isExpanded && 'md:mx-auto'
+                    )}
+                    onClick={toggleExpanded}
+                    title={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                  >
+                    {isExpanded ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  </Button>
+                )}
               </div>
               
               {/* Section Items */}
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
@@ -136,17 +143,21 @@ export default function DashboardSidebar() {
                       href={item.href}
                       onClick={() => setIsMobileOpen(false)}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group relative',
+                        'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors group relative',
                         isActive
                           ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                        !isExpanded && 'md:justify-center md:px-0'
                       )}
                     >
-                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <Icon className={cn(
+                        'h-4 w-4 flex-shrink-0',
+                        !isExpanded && 'md:h-4 md:w-4'
+                      )} />
                       <span
                         className={cn(
-                          'transition-opacity duration-300',
-                          !isExpanded && 'md:opacity-0 md:w-0 md:overflow-hidden'
+                          'text-sm whitespace-nowrap transition-all duration-300',
+                          !isExpanded && 'md:opacity-0 md:w-0 md:overflow-hidden md:absolute'
                         )}
                       >
                         {item.name}
@@ -154,7 +165,7 @@ export default function DashboardSidebar() {
 
                       {/* Tooltip for collapsed state */}
                       {!isExpanded && (
-                        <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-sm rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 hidden md:block border border-border">
+                        <div className="absolute left-full ml-2 px-2.5 py-1 bg-popover text-popover-foreground text-sm rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 hidden md:block border border-border shadow-lg">
                           {item.name}
                         </div>
                       )}
@@ -167,9 +178,12 @@ export default function DashboardSidebar() {
         </nav>
 
         {/* User section at bottom */}
-        <div className="p-4 border-t border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+        <div className="p-2.5 border-t border-border mt-auto">
+          <div className={cn(
+            'flex items-center gap-2.5',
+            !isExpanded && 'md:justify-center'
+          )}>
+            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
               {user?.photoURL ? (
                 <img 
                   src={user.photoURL} 
@@ -182,11 +196,14 @@ export default function DashboardSidebar() {
                 </span>
               )}
             </div>
-            <div className={cn('transition-opacity duration-300', !isExpanded && 'md:opacity-0 md:w-0 md:overflow-hidden')}>
-              <p className="text-foreground text-sm font-medium">
+            <div className={cn(
+              'min-w-0 flex-1 transition-all duration-300',
+              !isExpanded && 'md:opacity-0 md:w-0 md:overflow-hidden md:absolute'
+            )}>
+              <p className="text-foreground text-sm font-medium truncate">
                 {user?.displayName || 'User'}
               </p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground text-xs truncate">
                 {user?.email || 'user@example.com'}
               </p>
             </div>

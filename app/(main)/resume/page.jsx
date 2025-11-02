@@ -14,7 +14,7 @@ export default async function ResumePage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="w-full py-6">
       <ResumeOptions existingResumes={existingResumes} />
     </div>
   );

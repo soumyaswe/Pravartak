@@ -97,7 +97,7 @@ export default function RoadmapPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 sm:py-6 px-2 sm:px-2 lg:px-4 max-w-10xl">
+    <div className="w-full py-6 max-w-10xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4">
         <div>

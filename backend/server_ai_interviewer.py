@@ -16,6 +16,10 @@ from datetime import datetime
 import io
 import base64
 import threading
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -103,8 +107,9 @@ def phoneme_to_blend_shapes(phoneme, intensity=1.0):
     
     viseme_index = PHONEME_TO_VISEME_MAP.get(phoneme, 0)
     
-    if viseme_index == 0:  # Silence/neutral
-        blend_values['mouthClose'] = 0.3 * intensity
+    if viseme_index == 0:  # Silence/neutral - Keep mouth fully closed
+        blend_values['mouthClose'] = 1.0 * intensity
+        blend_values['jawOpen'] = 0.0  # Explicitly set jaw closed
     elif viseme_index in [1, 2, 3]:  # Open vowels
         blend_values['jawOpen'] = 0.6 * intensity
         blend_values['mouthFunnel'] = 0.3 * intensity
@@ -162,9 +167,10 @@ def phoneme_to_blend_shapes(phoneme, intensity=1.0):
     return blend_values
 
 
-def generate_blend_data_from_text(text, audio_duration=1.0):
-    """Generate blend shape animation data from text"""
-    chars_per_second = 15
+def generate_blend_data_from_text(text, speaking_rate=1.0):
+    """Generate blend shape animation data from text with adjusted timing"""
+    # Adjust character speed based on speaking rate (slower rate = more time per character)
+    chars_per_second = 15 / speaking_rate
     duration = max(len(text) / chars_per_second, 0.5)
     
     fps = 60
@@ -203,15 +209,18 @@ def generate_speech_and_animation(text):
         # Configure TTS
         synthesis_input = texttospeech.SynthesisInput(text=text)
         
+        # Get speaking rate from environment or use default
+        speaking_rate = float(os.environ.get('SPEAKING_RATE', '0.85'))
+        
         voice = texttospeech.VoiceSelectionParams(
             language_code='en-US',
-            name='en-US-Neural2-F',
+            name=os.environ.get('VOICE_NAME', 'en-US-Neural2-F'),
         )
         
         audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=1.0,
-            pitch=0.0,
+            speaking_rate=speaking_rate,  # Slower for better lip-sync
+            pitch=float(os.environ.get('VOICE_PITCH', '0.0')),
         )
         
         # Synthesize speech
@@ -228,8 +237,8 @@ def generate_speech_and_animation(text):
         with open(filepath, 'wb') as audio_file:
             audio_file.write(response.audio_content)
         
-        # Generate blend data
-        blend_data = generate_blend_data_from_text(text)
+        # Generate blend data (with adjusted timing for slower speech)
+        blend_data = generate_blend_data_from_text(text, speaking_rate)
         
         return blend_data, f'/audio/{filename}'
     
@@ -301,13 +310,18 @@ Based on their response, ask a relevant follow-up question or move to the next t
 def get_ai_response_streaming(session_id, user_text):
     """Get AI interviewer response using Gemini with streaming"""
     try:
+        print(f'🤖 Getting AI response for session: {session_id}')
+        print(f'📝 User text: {user_text}')
+        
         # Initialize chat session if it doesn't exist
         if session_id not in chat_sessions:
+            print(f'🆕 Creating new chat session for: {session_id}')
             chat_sessions[session_id] = gemini_model.start_chat()
             conversation_histories[session_id] = []
             
             # Get initial greeting with streaming
             initial_prompt = "Start the interview with a warm, professional greeting and your first question about the candidate's background. Keep it to 2-3 sentences."
+            print(f'📤 Sending initial prompt to Gemini...')
             response_stream = chat_sessions[session_id].send_message(
                 initial_prompt,
                 stream=True
@@ -323,6 +337,7 @@ def get_ai_response_streaming(session_id, user_text):
                 'role': 'interviewer',
                 'content': full_response
             })
+            print(f'✅ Initial response complete: {full_response}')
             return
         
         # Add user's response to history
@@ -336,6 +351,7 @@ def get_ai_response_streaming(session_id, user_text):
 
 Based on their response, ask a relevant follow-up question or move to the next topic. Keep your response to 1-3 sentences. Be natural and conversational."""
         
+        print(f'📤 Sending follow-up prompt to Gemini...')
         response_stream = chat_sessions[session_id].send_message(
             prompt,
             stream=True
@@ -352,9 +368,13 @@ Based on their response, ask a relevant follow-up question or move to the next t
             'role': 'interviewer',
             'content': full_response
         })
+        print(f'✅ Follow-up response complete: {full_response}')
     
     except Exception as e:
-        print(f'Error getting AI response: {str(e)}')
+        error_msg = f'Error getting AI response: {str(e)}'
+        print(f'❌ {error_msg}')
+        import traceback
+        traceback.print_exc()
         yield "I'm having trouble processing that. Could you please repeat?"
 
 
@@ -379,11 +399,12 @@ def handle_disconnect():
 
 
 @socketio.on('start_interview')
-def handle_start_interview():
+def handle_start_interview(data):
     """Initialize the interview with a greeting"""
     try:
         session_id = request.sid
-        print(f'🎤 Starting interview for session: {session_id}')
+        position = data.get('position', 'Software Engineer') if data else 'Software Engineer'
+        print(f'🎤 Starting interview for session: {session_id}, position: {position}')
         
         # Get initial AI greeting
         ai_greeting = get_ai_response(session_id, "")
@@ -408,13 +429,35 @@ def handle_start_interview():
 @socketio.on('audio_stream_start')
 def handle_audio_stream_start():
     """Handle start of audio streaming"""
-    print(f'🎙️ Audio stream started for session: {request.sid}')
+    session_id = request.sid
+    print(f'🎙️ Audio stream started for session: {session_id}')
+    
+    # Initialize buffer for this session
+    audio_stream_buffers[session_id] = []
+    
     emit('stream_ready', {'status': 'ready'})
+
+
+@socketio.on('audio_stream_data')
+def handle_audio_stream_data(data):
+    """Handle incoming audio data chunks from client"""
+    try:
+        session_id = request.sid
+        audio_chunk = data.get('audio', [])
+        
+        # Accumulate audio chunks in buffer
+        if session_id not in audio_stream_buffers:
+            audio_stream_buffers[session_id] = []
+        
+        audio_stream_buffers[session_id].extend(audio_chunk)
+        
+    except Exception as e:
+        print(f'❌ Error processing audio chunk: {str(e)}')
 
 
 @socketio.on('audio_chunk')
 def handle_audio_chunk(data):
-    """Handle incoming audio chunk from client"""
+    """Handle incoming audio chunk from client (legacy support)"""
     try:
         # This is a simplified version - in production, you'd accumulate chunks
         # and use streaming recognition with GCP Speech-to-Text
@@ -424,27 +467,30 @@ def handle_audio_chunk(data):
 
 
 @socketio.on('audio_stream_end')
-def handle_audio_stream_end(data):
+def handle_audio_stream_end(data=None):
     """Handle end of audio streaming and process the complete audio"""
     try:
         session_id = request.sid
         
-        # Get the complete audio data
-        audio_data = data.get('audio', '')
-        
-        if not audio_data:
+        # Get accumulated audio from buffer
+        if session_id not in audio_stream_buffers or not audio_stream_buffers[session_id]:
+            print(f'⚠️ No audio data buffered for session: {session_id}')
             emit('error', {'message': 'No audio data received'})
             return
         
-        print(f'🎧 Processing audio for session: {session_id}')
+        print(f'🎧 Processing {len(audio_stream_buffers[session_id])} audio samples for session: {session_id}')
         
-        # Decode base64 audio
-        audio_bytes = base64.b64decode(audio_data)
+        # Convert PCM samples to bytes
+        import struct
+        audio_bytes = struct.pack(f'{len(audio_stream_buffers[session_id])}h', *audio_stream_buffers[session_id])
         
-        # Configure Speech-to-Text
+        # Clear the buffer
+        audio_stream_buffers[session_id] = []
+        
+        # Configure Speech-to-Text for LINEAR16 PCM
         audio = speech.RecognitionAudio(content=audio_bytes)
         config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
+            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=48000,
             language_code='en-US',
             enable_automatic_punctuation=True,

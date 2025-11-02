@@ -400,7 +400,7 @@ export default function MockInterviewPage() {
 
   // Main interview interface
   return (
-    <div className="container mx-auto py-4 px-4 max-w-10xl">
+    <div className="w-full py-4 max-w-10xl mx-auto">
       <div className="grid lg:grid-cols-12 gap-6">
         {/* Left Sidebar - Progress/Navigation */}
         <div className="lg:col-span-3">

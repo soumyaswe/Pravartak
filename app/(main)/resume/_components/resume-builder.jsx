@@ -1416,7 +1416,7 @@ export default function ResumeBuilder({ mode = "create", initialResume = null })
         <form
           onSubmit={handleSubmit(onSubmit)}
           // Complete full width - no padding at all for edge-to-edge layout
-          className="h-full py-6"
+          className="h-full py-6 px-4"
         >
           <StepNavigation
             currentStep={currentStep}
@@ -1424,13 +1424,13 @@ export default function ResumeBuilder({ mode = "create", initialResume = null })
             validateStep={validateStep}
             errors={errors}
           />
-          {/* Minimal margin and padding for step content - prevents text from touching edges */}
-          <div className="mt-6 mb-24 px-4">{renderStep()}</div> 
+          {/* Step content */}
+          <div className="mt-6">{renderStep()}</div>
 
-          {/* Sticky Bottom Navigation */}
+          {/* Navigation Buttons - Part of Form */}
           {currentStep !== 'finalize' && (
-            <div className="fixed bottom-0 left-0 lg:w-1/2 bg-neutral-950 border-t border-neutral-800">
-              <div className="flex justify-between py-4 px-4">{/* Edge-to-edge navigation with minimal button spacing */}
+            <div className="mt-8 pt-6 border-t border-neutral-800">
+              <div className="flex justify-between gap-4">
                 {currentStep !== steps[0].id ? (
                   <button
                     type="button"
@@ -1456,10 +1456,10 @@ export default function ResumeBuilder({ mode = "create", initialResume = null })
             </div>
           )}
 
-          {/* Sticky Bottom Navigation for Finalize step */}
+          {/* Navigation for Finalize step */}
           {currentStep === 'finalize' && (
-            <div className="fixed bottom-0 left-0 lg:w-1/2 bg-neutral-950 border-t border-neutral-800">
-              <div className="flex justify-start py-4 px-4">{/* Edge-to-edge navigation for finalize with minimal button spacing */}
+            <div className="mt-8 pt-6 border-t border-neutral-800">
+              <div className="flex justify-start">
                 <button
                   type="button"
                   onClick={handleBack}
