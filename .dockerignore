@@ -18,6 +18,7 @@ coverage
 *.pem
 .env*.local
 .env
+!.env.production
 
 # IDE
 .vscode

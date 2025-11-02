@@ -19,6 +19,9 @@ COPY . .
 # Set environment variable for Prisma
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
+# Copy production environment variables for build
+COPY .env.production .env.production
+
 # Generate Prisma Client and build
 RUN npx prisma generate
 RUN npm run build
