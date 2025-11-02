@@ -34,10 +34,38 @@ function createAnimation(recordedData, morphTargetDictionary, bodyPart) {
         if (!(modifiedKey(key) in morphTargetDictionary)) {
           return;
         }
-        if (key == 'mouthShrugUpper') {
-          value += 0.4;
+        
+        // Heavy smoothing for natural, slow movements
+        let smoothedValue = value;
+        
+        // Apply 5-frame smoothing for very smooth transitions
+        if (i >= 2 && i < recordedData.length - 2) {
+          const prev2 = recordedData[i - 2].blendshapes[key] || 0;
+          const prev1 = recordedData[i - 1].blendshapes[key] || 0;
+          const next1 = recordedData[i + 1].blendshapes[key] || 0;
+          const next2 = recordedData[i + 2].blendshapes[key] || 0;
+          
+          // Gaussian-like weighted average for ultra-smooth motion
+          smoothedValue = (prev2 * 0.05 + prev1 * 0.25 + value * 0.4 + next1 * 0.25 + next2 * 0.05);
+        } else if (i > 0 && i < recordedData.length - 1) {
+          // 3-frame smoothing for edges
+          const prevValue = recordedData[i - 1].blendshapes[key] || 0;
+          const nextValue = recordedData[i + 1].blendshapes[key] || 0;
+          smoothedValue = (prevValue * 0.25 + value * 0.5 + nextValue * 0.25);
         }
-        animation[morphTargetDictionary[modifiedKey(key)]].push(value);
+        
+        // Special handling for mouthShrugUpper to improve lip appearance
+        if (key == 'mouthShrugUpper') {
+          smoothedValue += 0.3;
+        }
+        
+        // Reduce overall intensity for more subtle movement
+        smoothedValue *= 0.8;
+        
+        // Clamp values between 0 and 1
+        smoothedValue = Math.max(0, Math.min(1, smoothedValue));
+        
+        animation[morphTargetDictionary[modifiedKey(key)]].push(smoothedValue);
       });
       time.push(finishedFrames / fps);
       finishedFrames++;

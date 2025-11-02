@@ -126,9 +126,11 @@ def phoneme_to_blend_shapes(phoneme, intensity=1.0):
     
     viseme_index = PHONEME_TO_VISEME_MAP.get(phoneme, 0)
     
-    if viseme_index == 0:  # Silence/neutral - Keep mouth fully closed
-        blend_values['mouthClose'] = 1.0 * intensity
-        blend_values['jawOpen'] = 0.0  # Explicitly set jaw closed
+    if viseme_index == 0:  # Silence/neutral - Perfect resting position
+        # Neutral face: completely relaxed, lips together, jaw closed
+        blend_values['mouthClose'] = 0.0  # Don't force close, let it rest naturally
+        blend_values['jawOpen'] = 0.0  # Jaw completely closed
+        # Keep everything else at 0 for natural resting face
     elif viseme_index in [1, 2, 3]:  # Open vowels
         blend_values['jawOpen'] = 0.6 * intensity
         blend_values['mouthFunnel'] = 0.3 * intensity
@@ -187,37 +189,91 @@ def phoneme_to_blend_shapes(phoneme, intensity=1.0):
 
 
 def generate_blend_data_from_text(text, speaking_rate=1.0):
-    """Generate blend shape animation data from text with adjusted timing"""
-    # Adjust character speed based on speaking rate (slower rate = more time per character)
-    chars_per_second = 15 / speaking_rate
-    duration = max(len(text) / chars_per_second, 0.5)
+    """Generate blend shape animation data from text with natural timing"""
+    import math
+    
+    words = text.split()
+    word_count = max(len(words), 1)
+    
+    # Natural speaking: ~2 words per second, adjusted by rate
+    words_per_second = 2.0 * speaking_rate
+    duration = max(word_count / words_per_second, 0.5)
+    
+    fps = 60
+    total_frames = int(duration * fps)
+    blend_data = []
+    
+    # Simplified, slower phoneme cycle for natural speech
+    phoneme_cycle = ['sil', 'AA', 'EH', 'OW', 'M', 'sil']
+    cycle_length = len(phoneme_cycle)
+    frames_per_phoneme = max(8, total_frames // (word_count * 3))  # Slower transitions
+    
+    for frame in range(total_frames):
+        # Slow phoneme cycling
+        phoneme_index = (frame // frames_per_phoneme) % cycle_length
+        phoneme = phoneme_cycle[phoneme_index]
+        
+        # Very subtle intensity (0.2 to 0.5 range for natural look)
+        phase = (frame % frames_per_phoneme) / frames_per_phoneme
+        intensity = 0.3 + 0.2 * math.sin(phase * math.pi)
+        
+        blend_values = phoneme_to_blend_shapes(phoneme, intensity)
+        
+        # Reduce all values by 40% for more subtle movement
+        for key in blend_values:
+            blend_values[key] *= 0.6
+        
+        frame_data = {'blendshapes': blend_values}
+        blend_data.append(frame_data)
+    
+    # Extended neutral closing (30 frames = 0.5 seconds)
+    neutral_values = phoneme_to_blend_shapes('sil', 1.0)
+    for _ in range(30):
+        blend_data.append({'blendshapes': neutral_values})
+    
+    return blend_data
+
+
+def generate_blend_data_from_actual_duration(text, duration):
+    """Generate blend shape animation data from text with actual audio duration"""
+    import math
     
     fps = 60
     total_frames = int(duration * fps)
     blend_data = []
     
     words = text.split()
-    time_per_word = duration / max(len(words), 1)
+    word_count = max(len(words), 1)
+    
+    # Simplified, slower phoneme cycle for natural speech
+    phoneme_cycle = ['sil', 'AA', 'EH', 'OW', 'M', 'sil']
+    cycle_length = len(phoneme_cycle)
+    frames_per_phoneme = max(8, total_frames // (word_count * 3))  # Slower transitions
     
     for frame in range(total_frames):
-        current_time = frame / fps
-        word_index = int(current_time / time_per_word)
-        if word_index >= len(words):
-            word_index = len(words) - 1
+        # Slow phoneme cycling
+        phoneme_index = (frame // frames_per_phoneme) % cycle_length
+        phoneme = phoneme_cycle[phoneme_index]
         
-        intensity = 0.5 + 0.5 * abs((frame % 20) - 10) / 10.0
+        # Very subtle intensity (0.2 to 0.5 range for natural look)
+        phase = (frame % frames_per_phoneme) / frames_per_phoneme
+        intensity = 0.3 + 0.2 * math.sin(phase * math.pi)
         
-        if frame % 10 < 5:
-            blend_values = phoneme_to_blend_shapes('AA', intensity)
-        else:
-            blend_values = phoneme_to_blend_shapes('M', intensity)
+        blend_values = phoneme_to_blend_shapes(phoneme, intensity)
+        
+        # Reduce all values by 40% for more subtle movement
+        for key in blend_values:
+            blend_values[key] *= 0.6
         
         frame_data = {'blendshapes': blend_values}
         blend_data.append(frame_data)
     
+    # Extended neutral closing (30 frames = 0.5 seconds)
     neutral_values = phoneme_to_blend_shapes('sil', 1.0)
-    final_frame = {'blendshapes': neutral_values}
-    blend_data.append(final_frame)
+    for _ in range(30):
+        blend_data.append({'blendshapes': neutral_values})
+    
+    print(f'✅ Generated {len(blend_data)} frames for {duration:.2f}s audio ({len(blend_data)/fps:.2f}s animation)')
     
     return blend_data
 
@@ -229,7 +285,7 @@ def generate_speech_and_animation(text):
         synthesis_input = texttospeech.SynthesisInput(text=text)
         
         # Get speaking rate from environment or use default
-        speaking_rate = float(os.environ.get('SPEAKING_RATE', '0.85'))
+        speaking_rate = float(os.environ.get('SPEAKING_RATE', '0.9'))  # Natural speaking speed
         
         voice = texttospeech.VoiceSelectionParams(
             language_code='en-US',
@@ -238,7 +294,7 @@ def generate_speech_and_animation(text):
         
         audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=speaking_rate,  # Slower for better lip-sync
+            speaking_rate=speaking_rate,  # Natural, clear speech
             pitch=float(os.environ.get('VOICE_PITCH', '0.0')),
         )
         
@@ -256,8 +312,22 @@ def generate_speech_and_animation(text):
         with open(filepath, 'wb') as audio_file:
             audio_file.write(response.audio_content)
         
-        # Generate blend data (with adjusted timing for slower speech)
-        blend_data = generate_blend_data_from_text(text, speaking_rate)
+        # Get actual audio duration for perfect sync
+        try:
+            from mutagen.mp3 import MP3
+            audio_file = MP3(filepath)
+            actual_duration = audio_file.info.length
+            print(f'🎵 Audio duration: {actual_duration:.2f}s for text: "{text[:50]}..."')
+            
+            # Generate blend data matching actual audio duration
+            blend_data = generate_blend_data_from_actual_duration(text, actual_duration)
+        except ImportError:
+            print('⚠️ mutagen not installed, using estimated duration')
+            # Fallback to estimated duration
+            blend_data = generate_blend_data_from_text(text, speaking_rate)
+        except Exception as e:
+            print(f'⚠️ Could not get audio duration: {e}, using estimated')
+            blend_data = generate_blend_data_from_text(text, speaking_rate)
         
         return blend_data, f'/audio/{filename}'
     

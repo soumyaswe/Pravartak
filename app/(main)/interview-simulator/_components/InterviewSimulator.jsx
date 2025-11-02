@@ -172,7 +172,8 @@ function Avatar({ avatar_url, speak, setSpeak, text, setAudioSource, playing, bl
   });
 
   const [clips, setClips] = useState([]);
-  const mixer = new THREE.AnimationMixer(gltf.scene);
+  const mixer = useMemo(() => new THREE.AnimationMixer(gltf.scene), [gltf.scene]);
+  const activeActionsRef = useRef([]);
 
   // Handle external blend data from WebSocket
   useEffect(() => {
@@ -237,18 +238,58 @@ function Avatar({ avatar_url, speak, setSpeak, text, setAudioSource, playing, bl
 
   // Play animation clips when available
   useEffect(() => {
-    if (playing === false) return;
+    if (playing === false) {
+      // Stop all active animations when not playing
+      activeActionsRef.current.forEach(action => {
+        action.stop();
+      });
+      activeActionsRef.current = [];
+      
+      // Reset to perfect neutral position (all morph targets to 0)
+      if (morphTargetDictionaryBody) {
+        gltf.scene.traverse(node => {
+          if (node.morphTargetInfluences && node.name.includes("Body")) {
+            // Reset ALL morph targets to 0 for natural resting face
+            Object.keys(morphTargetDictionaryBody).forEach(key => {
+              const index = morphTargetDictionaryBody[key];
+              node.morphTargetInfluences[index] = 0.0;  // Complete neutral position
+            });
+          }
+        });
+      }
+      
+      // Also reset lower teeth
+      if (morphTargetDictionaryLowerTeeth) {
+        gltf.scene.traverse(node => {
+          if (node.morphTargetInfluences && node.name.includes("TeethLower")) {
+            Object.keys(morphTargetDictionaryLowerTeeth).forEach(key => {
+              const index = morphTargetDictionaryLowerTeeth[key];
+              node.morphTargetInfluences[index] = 0.0;
+            });
+          }
+        });
+      }
+      return;
+    }
     
     console.log('🗣️ Playing speech animation clips:', clips.length);
+    
+    // Clear previous actions
+    activeActionsRef.current.forEach(action => {
+      action.stop();
+    });
+    activeActionsRef.current = [];
     
     _.each(clips, clip => {
       let clipAction = mixer.clipAction(clip);
       clipAction.setLoop(THREE.LoopOnce);
+      clipAction.clampWhenFinished = true;  // Hold last frame
       clipAction.play();
+      activeActionsRef.current.push(clipAction);
       console.log('▶️ Clip playing - duration:', clip.duration);
     });
 
-  }, [playing, clips]);
+  }, [playing, clips, morphTargetDictionaryBody, morphTargetDictionaryLowerTeeth, gltf.scene, mixer]);
 
   useFrame((state, delta) => {
     mixer.update(delta);
@@ -411,7 +452,7 @@ function AppInterviewer() {
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioMuted, setAudioMuted] = useState(false);
   
-  // Initialize with neutral blend data (mouth closed, eyes open)
+  // Initialize with neutral blend data (completely neutral - all zeros)
   const neutralBlendData = useMemo(() => {
     const blendShapes = [
       'mouthClose', 'mouthFunnel', 'mouthPucker', 'mouthLeft', 'mouthRight',
@@ -428,19 +469,13 @@ function AppInterviewer() {
       'eyeSquintLeft', 'eyeSquintRight', 'eyeWideLeft', 'eyeWideRight'
     ];
     
+    // Perfect neutral frame: all values at 0 for natural resting face
     const neutralFrame = blendShapes.reduce((acc, shape) => {
-      // Mouth closed, eyes open (blink = 0), jaw closed
-      if (shape === 'mouthClose') {
-        acc[shape] = 1.0;
-      } else if (shape === 'eyeBlinkLeft' || shape === 'eyeBlinkRight') {
-        acc[shape] = 0.0; // Explicitly keep eyes open
-      } else {
-        acc[shape] = 0.0;
-      }
+      acc[shape] = 0.0;  // All at zero for natural resting position
       return acc;
     }, {});
     
-    return [{ time: 0, blendshapes: neutralFrame }]; // Use lowercase 'blendshapes' to match backend
+    return [{ time: 0, blendshapes: neutralFrame }];
   }, []);
   
   const [blendData, setBlendData] = useState(neutralBlendData);
@@ -840,7 +875,7 @@ function AppInterviewer() {
   function playerEnded(e) {
     console.log('🎵 Audio ended');
     setAudioSource(null);
-    setPlaying(false);
+    setPlaying(false);  // This will trigger the reset in the useEffect above
     setStatusMessage('Your turn to speak');
   }
 
