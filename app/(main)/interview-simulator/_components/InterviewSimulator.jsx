@@ -447,6 +447,7 @@ function AppInterviewer() {
   const [statusMessage, setStatusMessage] = useState('Initializing...');
   const [userTranscript, setUserTranscript] = useState('');
   const [aiTranscript, setAiTranscript] = useState('');
+  const [conversationHistory, setConversationHistory] = useState([]);
   const [mediaStream, setMediaStream] = useState(null);
 
   // Initialize WebSocket connection
@@ -483,6 +484,11 @@ function AppInterviewer() {
       setAudioSource(host + data.filename);
       setAiTranscript(data.transcript || '');
       setStatusMessage('AI Interviewer is speaking...');
+      
+      // Add to conversation history
+      if (data.transcript) {
+        setConversationHistory(prev => [...prev, { role: 'ai', text: data.transcript }]);
+      }
     });
 
     // Handle streaming chunks from AI
@@ -518,12 +524,23 @@ function AppInterviewer() {
     socket.on('transcription_result', (data) => {
       console.log('📝 Transcription:', data);
       setUserTranscript(data.transcript);
-      setStatusMessage(`You said: "${data.transcript}"`);
+      if (data.transcript && data.transcript.trim()) {
+        setStatusMessage(`You said: "${data.transcript}" (${(data.confidence * 100).toFixed(0)}% confidence)`);
+        
+        // Add to conversation history
+        setConversationHistory(prev => [...prev, { role: 'user', text: data.transcript }]);
+      } else {
+        setStatusMessage('Processing...');
+      }
     });
 
     socket.on('error', (data) => {
       console.error('❌ Error:', data);
       setStatusMessage(`Error: ${data.message}`);
+    });
+
+    socket.on('stream_ready', (data) => {
+      console.log('✅ Stream ready:', data);
     });
 
     return () => {
@@ -545,7 +562,9 @@ function AppInterviewer() {
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            sampleRate: 48000
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 1  // Mono audio
           }
         });
 
@@ -610,8 +629,10 @@ function AppInterviewer() {
 
     try {
       audioChunksRef.current = [];
+      let totalSamplesSent = 0;  // Track total samples sent
 
       // Emit stream start
+      console.log('📤 Emitting audio_stream_start...');
       socket.emit('audio_stream_start');
 
       // Create MediaRecorder with audio only
@@ -633,7 +654,7 @@ function AppInterviewer() {
         }
       }
       
-      console.log('Using MIME type:', mimeType);
+      console.log('🎙️ Using MIME type:', mimeType);
       
       const mediaRecorder = new MediaRecorder(audioStream, {
         mimeType: mimeType
@@ -643,84 +664,138 @@ function AppInterviewer() {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
           
-          // Convert chunk to PCM and send to backend
+          console.log(`📥 Received audio chunk: ${event.data.size} bytes, total chunks: ${audioChunksRef.current.length}`);
+          
+          // Convert chunk to PCM and send to backend immediately
           try {
             const audioBlob = event.data;
             const arrayBuffer = await audioBlob.arrayBuffer();
             
-            // Create audio context
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)({
-              sampleRate: 16000 // Use 16kHz for speech recognition
-            });
+            if (arrayBuffer.byteLength === 0) {
+              console.warn('⚠️ Empty audio buffer, skipping...');
+              return;
+            }
+            
+            console.log(`🔄 Processing chunk ${audioChunksRef.current.length}: ${arrayBuffer.byteLength} bytes`);
+            
+            // Create audio context with native sample rate to preserve quality
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             
             // Decode audio data with error handling
             let audioBuffer;
             try {
               audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
             } catch (decodeError) {
-              console.warn('Direct decode failed, trying alternative method:', decodeError);
+              console.warn('⚠️ Direct decode failed:', decodeError.message);
               // Skip this chunk if decode fails
               audioContext.close();
               return;
             }
             
-            // Get PCM data (Int16 samples)
+            if (!audioBuffer || audioBuffer.length === 0) {
+              console.warn('⚠️ Audio buffer is empty after decode');
+              audioContext.close();
+              return;
+            }
+
+            // Resample to 16kHz for speech recognition
+            const targetSampleRate = 16000;
+            const sourceSampleRate = audioBuffer.sampleRate;
+            const ratio = sourceSampleRate / targetSampleRate;
+            
             const pcmData = audioBuffer.getChannelData(0);
-            const pcmInt16 = new Int16Array(pcmData.length);
-            for (let i = 0; i < pcmData.length; i++) {
-              // Convert Float32 to Int16
-              const s = Math.max(-1, Math.min(1, pcmData[i]));
+            const targetLength = Math.floor(pcmData.length / ratio);
+            const resampledData = new Float32Array(targetLength);
+            
+            // Simple linear resampling
+            for (let i = 0; i < targetLength; i++) {
+              const sourceIndex = Math.floor(i * ratio);
+              resampledData[i] = pcmData[sourceIndex];
+            }
+            
+            // Convert Float32 to Int16
+            const pcmInt16 = new Int16Array(resampledData.length);
+            for (let i = 0; i < resampledData.length; i++) {
+              const s = Math.max(-1, Math.min(1, resampledData[i]));
               pcmInt16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
             }
             
+            console.log(`📊 Chunk ${audioChunksRef.current.length}: ${pcmInt16.length} samples at 16kHz (from ${pcmData.length} at ${sourceSampleRate}Hz)`);
+            
+            totalSamplesSent += pcmInt16.length;
+            
             // Send PCM data to backend
-            socket.emit('audio_stream_data', { audio: Array.from(pcmInt16) });
+            if (socket && socket.connected) {
+              socket.emit('audio_stream_data', { audio: Array.from(pcmInt16) });
+              console.log(`📤 Sent chunk ${audioChunksRef.current.length}: ${pcmInt16.length} samples to backend (total: ${totalSamplesSent}, ${(totalSamplesSent/16000).toFixed(2)}s)`);
+            } else {
+              console.error('❌ Socket not connected, cannot send audio data');
+            }
             
             // Close audio context to free resources
             audioContext.close();
           } catch (err) {
-            console.error('Error processing audio chunk:', err);
+            console.error('❌ Error processing audio chunk:', err);
           }
+        } else {
+          console.warn('⚠️ Received chunk with 0 size');
         }
-      };
-
-      mediaRecorder.onstop = () => {
+      };      mediaRecorder.onstop = () => {
         if (!socket) {
-          console.error('Socket not available');
+          console.error('❌ Socket not available');
           setStatusMessage('Connection lost');
           return;
         }
 
-        if (audioChunksRef.current.length === 0) {
-          console.error('No audio data recorded');
-          setStatusMessage('Error: No audio data received');
+        const totalChunks = audioChunksRef.current.length;
+        
+        console.log(`📦 Recording stopped - received ${totalChunks} audio chunks`);
+        
+        if (totalChunks === 0) {
+          console.error('❌ No audio data recorded');
+          setStatusMessage('Error: No audio captured. Please check your microphone.');
           return;
         }
 
-        console.log('📦 Recorded', audioChunksRef.current.length, 'audio chunks');
+        console.log('🔚 Sending audio_stream_end to backend...');
         
-        // Emit end of stream
-        socket.emit('audio_stream_end');
-        setStatusMessage('Processing your response...');
+        // Give a small delay for the final ondataavailable to process
+        setTimeout(() => {
+          socket.emit('audio_stream_end');
+          setStatusMessage('🔄 Processing your response...');
+          console.log(`✅ Audio stream end signal sent - total samples sent: ${totalSamplesSent} (${(totalSamplesSent/16000).toFixed(2)}s)`);
+        }, 100);
       };
 
       mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start(100); // Collect data every 100ms
+      
+      // Start recording - no timeslice, will collect all data until stop()
+      mediaRecorder.start();
       setIsRecording(true);
-      setStatusMessage('🎤 Recording your answer...');
+      setUserTranscript(''); // Clear previous transcript
+      setStatusMessage('🎤 Recording... Speak clearly into your microphone');
+      
+      console.log('✅ Recording started successfully (will capture all audio until stopped)');
 
     } catch (err) {
-      console.error('Error starting recording:', err);
-      setStatusMessage('Error starting recording');
+      console.error('❌ Error starting recording:', err);
+      setStatusMessage('Error starting recording. Please check microphone permissions.');
     }
   };
 
   // Stop recording
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      console.log('🛑 Stopping recording...');
+      
+      // Request any remaining data before stopping
+      if (mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.requestData(); // Force flush of any buffered data
+      }
+      
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      setStatusMessage('Processing your answer...');
+      setStatusMessage('🔄 Processing your answer... Please wait');
     }
   };
 
@@ -1301,45 +1376,31 @@ function AppInterviewer() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-            {aiTranscript && (
-              <div>
-                <div style={{ color: '#8b5cf6', fontSize: '12px', marginBottom: '6px', fontWeight: '600' }}>
-                  AI Interviewer:
+            {conversationHistory.length > 0 ? (
+              conversationHistory.map((message, index) => (
+                <div key={index}>
+                  <div style={{ 
+                    color: message.role === 'ai' ? '#8b5cf6' : '#3b82f6', 
+                    fontSize: '12px', 
+                    marginBottom: '6px', 
+                    fontWeight: '600' 
+                  }}>
+                    {message.role === 'ai' ? 'AI Interviewer:' : 'You:'}
+                  </div>
+                  <div style={{ 
+                    background: message.role === 'ai' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.15)', 
+                    padding: '12px 16px', 
+                    borderRadius: '12px',
+                    border: `1px solid ${message.role === 'ai' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+                    color: '#fff',
+                    fontSize: '14px',
+                    lineHeight: '1.5'
+                  }}>
+                    {message.text}
+                  </div>
                 </div>
-                <div style={{ 
-                  background: 'rgba(139, 92, 246, 0.15)', 
-                  padding: '12px 16px', 
-                  borderRadius: '12px',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                  color: '#fff',
-                  fontSize: '14px',
-                  lineHeight: '1.5'
-                }}>
-                  {aiTranscript}
-                </div>
-              </div>
-            )}
-
-            {userTranscript && (
-              <div>
-                <div style={{ color: '#3b82f6', fontSize: '12px', marginBottom: '6px', fontWeight: '600' }}>
-                  You:
-                </div>
-                <div style={{ 
-                  background: 'rgba(59, 130, 246, 0.15)', 
-                  padding: '12px 16px', 
-                  borderRadius: '12px',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  color: '#fff',
-                  fontSize: '14px',
-                  lineHeight: '1.5'
-                }}>
-                  {userTranscript}
-                </div>
-              </div>
-            )}
-
-            {!aiTranscript && !userTranscript && (
+              ))
+            ) : (
               <div style={{ textAlign: 'center', color: '#666', padding: '60px 20px', fontSize: '14px' }}>
                 The conversation will appear here...
               </div>

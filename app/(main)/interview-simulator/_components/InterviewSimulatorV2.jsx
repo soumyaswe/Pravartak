@@ -284,7 +284,10 @@ export default function InterviewSimulatorV2() {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      timeout: 600000,  // 600 seconds (10 minutes) connection timeout for very long audio processing
+      pingTimeout: 600000,  // 600 seconds ping timeout
+      pingInterval: 120000  // Ping every 120 seconds to keep connection alive
     });
 
     socket.on('connect', () => {
@@ -414,13 +417,14 @@ export default function InterviewSimulatorV2() {
     
     const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
     const source = audioContext.createMediaStreamSource(mediaStream);
-    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+    const processor = audioContext.createScriptProcessor(8192, 1, 1);  // Larger buffer (8192) for longer recordings
     
     source.connect(processor);
     processor.connect(audioContext.destination);
     
     socket.emit('audio_stream_start');
     
+    let chunkCount = 0;
     processor.onaudioprocess = (e) => {
       if (!isRecording) return;
       
@@ -432,6 +436,12 @@ export default function InterviewSimulatorV2() {
       }
       
       socket.emit('audio_stream_data', { audio: Array.from(pcmData) });
+      
+      // Log progress every ~1 second for long recordings
+      chunkCount++;
+      if (chunkCount % 6 === 0) {  // ~1 second at 48kHz with 8192 buffer
+        console.log(`📊 Recording in progress... ${(chunkCount * 8192 / 48000).toFixed(1)}s`);
+      }
     };
     
     window.audioProcessor = processor;

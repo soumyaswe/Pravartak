@@ -1,14 +1,13 @@
 """
 Flask SocketIO backend server for AI Interviewer Avatar
-Integrates GCP Text-to-Speech, Speech-to-Text, and Vertex AI (Gemini)
+Integrates GCP Text-to-Speech, Speech-to-Text, and Google Gemini API
 """
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from google.cloud import texttospeech, speech
-import vertexai
-from vertexai.preview.generative_models import GenerativeModel
+import google.generativeai as genai
 import os
 import json
 import uuid
@@ -32,23 +31,43 @@ CORS(app, resources={
     }
 })
 
-# Initialize SocketIO with CORS
+# Initialize SocketIO with CORS and extended timeouts for long audio processing
 socketio = SocketIO(app, cors_allowed_origins=[
     "http://localhost:3000",
     "http://localhost:8000", 
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8000"
-], async_mode='eventlet')
+], async_mode='eventlet', 
+   ping_timeout=600,  # Increase timeout to 600 seconds (10 minutes) for very long audio processing
+   ping_interval=120,  # Send ping every 120 seconds to keep connection alive
+   max_http_buffer_size=100 * 1024 * 1024  # 100MB buffer for very large audio data
+)
 
 # Initialize Google Cloud clients
 tts_client = texttospeech.TextToSpeechClient()
 stt_client = speech.SpeechClient()
 
-# Initialize Vertex AI (Gemini)
-# Make sure to set GOOGLE_CLOUD_PROJECT environment variable
-project_id = os.environ.get('GCP_PROJECT_ID', 'your-project-id')
-vertexai.init(project=project_id, location="us-central1")
-gemini_model = GenerativeModel("gemini-1.5-flash")
+# Initialize Gemini API (using API key instead of Vertex AI)
+gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
+if not gemini_api_key:
+    print('⚠️ WARNING: GEMINI_API_KEY not set in environment variables')
+    print('Please set GEMINI_API_KEY in your .env file')
+else:
+    genai.configure(api_key=gemini_api_key)
+    print('✅ Gemini API configured successfully')
+
+# Use Gemini 2.5 Flash
+try:
+    gemini_model = genai.GenerativeModel('gemini-2.5-flash')
+    print('✅ Using Gemini 2.5 Flash')
+except Exception as e:
+    print(f'⚠️ Gemini 2.5 Flash not available, trying 2.0 Flash: {e}')
+    try:
+        gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        print('✅ Using Gemini 2.0 Flash Experimental')
+    except Exception as e2:
+        print(f'⚠️ Falling back to 1.5 Flash: {e2}')
+        gemini_model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Directory to store generated audio files
 AUDIO_DIR = 'audio_files'
@@ -250,47 +269,53 @@ def generate_speech_and_animation(text):
 def get_ai_response(session_id, user_text):
     """Get AI interviewer response using Gemini"""
     try:
-        # Initialize chat session if it doesn't exist
+        print(f'🤖 Getting AI response for session: {session_id}')
+        print(f'📝 User text: "{user_text}"')
+        
+        # Check if chat session exists (it should have been created in start_interview)
         if session_id not in chat_sessions:
-            # Create system prompt for the AI interviewer
-            system_instruction = """You are Alex, a professional and friendly AI interviewer conducting a technical interview for a Senior Software Developer position.
-
-Your responsibilities:
-- Ask relevant technical and behavioral questions
-- Listen actively to the candidate's responses
-- Ask follow-up questions based on their answers
-- Keep questions concise and clear (1-3 sentences max)
-- Be encouraging and professional
-- Cover topics like: technical skills, project experience, problem-solving, teamwork, and career goals
-
-Start with a warm greeting and ask about their background."""
-
+            print(f'⚠️ No existing chat session for {session_id}, creating new one')
             chat_sessions[session_id] = gemini_model.start_chat()
             conversation_histories[session_id] = []
             
-            # Get initial greeting
-            initial_prompt = "Start the interview with a warm, professional greeting and your first question about the candidate's background. Keep it to 2-3 sentences."
-            response = chat_sessions[session_id].send_message(initial_prompt)
-            ai_response = response.text
-            
+            # If no text provided, get initial greeting
+            if not user_text or not user_text.strip():
+                initial_prompt = """You are Alicia, a professional AI interviewer. Start with:
+1. A warm greeting
+2. Brief introduction of yourself
+3. Ask the candidate to introduce themselves
+
+Keep it to 2-3 sentences."""
+                
+                response = chat_sessions[session_id].send_message(initial_prompt)
+                ai_response = response.text
+                
+                conversation_histories[session_id].append({
+                    'role': 'interviewer',
+                    'content': ai_response
+                })
+                
+                print(f'✅ Initial greeting: {ai_response}')
+                return ai_response
+        
+        # Add user's response to history if not empty
+        if user_text and user_text.strip():
             conversation_histories[session_id].append({
-                'role': 'interviewer',
-                'content': ai_response
+                'role': 'candidate',
+                'content': user_text
             })
             
-            return ai_response
-        
-        # Add user's response to history
-        conversation_histories[session_id].append({
-            'role': 'candidate',
-            'content': user_text
-        })
-        
-        # Generate follow-up question
-        prompt = f"""The candidate just said: "{user_text}"
+            # Generate follow-up question
+            prompt = f"""The candidate just said: "{user_text}"
 
-Based on their response, ask a relevant follow-up question or move to the next topic. Keep your response to 1-3 sentences. Be natural and conversational."""
+Based on their response, ask a relevant follow-up question or move to the next interview topic. 
+Keep your response natural, conversational, and to 2-3 sentences maximum. 
+Be encouraging and professional."""
+        else:
+            # If empty text, ask them to speak up
+            prompt = "The candidate seems to have paused or you didn't hear them clearly. Politely ask them to repeat or elaborate on their answer. Keep it to 1-2 sentences."
         
+        print(f'📤 Sending prompt to Gemini...')
         response = chat_sessions[session_id].send_message(prompt)
         ai_response = response.text
         
@@ -300,11 +325,15 @@ Based on their response, ask a relevant follow-up question or move to the next t
             'content': ai_response
         })
         
+        print(f'✅ AI response: {ai_response}')
         return ai_response
     
     except Exception as e:
-        print(f'Error getting AI response: {str(e)}')
-        return "I'm having trouble processing that. Could you please repeat?"
+        error_msg = f'Error getting AI response: {str(e)}'
+        print(f'❌ {error_msg}')
+        import traceback
+        traceback.print_exc()
+        return "I'm having trouble processing that. Could you please repeat your answer?"
 
 
 def get_ai_response_streaming(session_id, user_text):
@@ -406,8 +435,30 @@ def handle_start_interview(data):
         position = data.get('position', 'Software Engineer') if data else 'Software Engineer'
         print(f'🎤 Starting interview for session: {session_id}, position: {position}')
         
-        # Get initial AI greeting
-        ai_greeting = get_ai_response(session_id, "")
+        # Initialize the chat session with system instruction
+        if session_id not in chat_sessions:
+            chat_sessions[session_id] = gemini_model.start_chat()
+            conversation_histories[session_id] = []
+            
+            # Create personalized greeting based on position
+            initial_prompt = f"""You are Alicia, a professional AI interviewer. Start the interview with:
+1. A warm, friendly greeting
+2. Introduce yourself
+3. Mention you'll be interviewing them for the {position} position
+4. Ask them to introduce themselves briefly
+
+Keep your greeting natural, warm and professional. Keep it to 2-3 sentences maximum."""
+            
+            print(f'📤 Getting initial greeting for {position} position...')
+            response = chat_sessions[session_id].send_message(initial_prompt)
+            ai_greeting = response.text
+            
+            conversation_histories[session_id].append({
+                'role': 'interviewer',
+                'content': ai_greeting
+            })
+        else:
+            ai_greeting = "Welcome back! Let's continue our interview. Please tell me about yourself."
         
         # Generate speech and animation
         blend_data, audio_filename = generate_speech_and_animation(ai_greeting)
@@ -422,7 +473,9 @@ def handle_start_interview(data):
         print(f'🗣️ AI says: {ai_greeting}')
     
     except Exception as e:
-        print(f'Error starting interview: {str(e)}')
+        print(f'❌ Error starting interview: {str(e)}')
+        import traceback
+        traceback.print_exc()
         emit('error', {'message': str(e)})
 
 
@@ -445,14 +498,30 @@ def handle_audio_stream_data(data):
         session_id = request.sid
         audio_chunk = data.get('audio', [])
         
+        if not audio_chunk:
+            print(f'⚠️ Received empty audio chunk for session: {session_id}')
+            return
+        
         # Accumulate audio chunks in buffer
         if session_id not in audio_stream_buffers:
             audio_stream_buffers[session_id] = []
         
+        chunk_size = len(audio_chunk)
         audio_stream_buffers[session_id].extend(audio_chunk)
+        
+        # Log progress every few chunks
+        total_samples = len(audio_stream_buffers[session_id])
+        if total_samples % 8000 == 0 and total_samples > 0:  # Log every 0.5 seconds
+            print(f'📊 Buffered {total_samples} samples ({total_samples/16000:.2f}s) for session: {session_id}')
+        
+        # Log first chunk to confirm receiving
+        if total_samples == chunk_size:
+            print(f'📥 First audio chunk received: {chunk_size} samples for session: {session_id}')
         
     except Exception as e:
         print(f'❌ Error processing audio chunk: {str(e)}')
+        import traceback
+        traceback.print_exc()
 
 
 @socketio.on('audio_chunk')
@@ -469,79 +538,169 @@ def handle_audio_chunk(data):
 @socketio.on('audio_stream_end')
 def handle_audio_stream_end(data=None):
     """Handle end of audio streaming and process the complete audio"""
-    try:
-        session_id = request.sid
-        
-        # Get accumulated audio from buffer
-        if session_id not in audio_stream_buffers or not audio_stream_buffers[session_id]:
-            print(f'⚠️ No audio data buffered for session: {session_id}')
-            emit('error', {'message': 'No audio data received'})
-            return
-        
-        print(f'🎧 Processing {len(audio_stream_buffers[session_id])} audio samples for session: {session_id}')
-        
-        # Convert PCM samples to bytes
-        import struct
-        audio_bytes = struct.pack(f'{len(audio_stream_buffers[session_id])}h', *audio_stream_buffers[session_id])
-        
-        # Clear the buffer
-        audio_stream_buffers[session_id] = []
-        
-        # Configure Speech-to-Text for LINEAR16 PCM
-        audio = speech.RecognitionAudio(content=audio_bytes)
-        config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=48000,
-            language_code='en-US',
-            enable_automatic_punctuation=True,
-        )
-        
-        # Transcribe audio
-        response = stt_client.recognize(config=config, audio=audio)
-        
-        if not response.results:
-            emit('transcription_result', {'transcript': '', 'confidence': 0})
-            return
-        
-        # Get the transcript
-        transcript = response.results[0].alternatives[0].transcript
-        confidence = response.results[0].alternatives[0].confidence
-        
-        print(f'📝 Transcription: {transcript} (confidence: {confidence})')
-        
-        # Send transcription to client
-        emit('transcription_result', {
-            'transcript': transcript,
-            'confidence': confidence
-        })
-        
-        # Use streaming AI response for live feel
-        full_response = ""
-        for ai_chunk in get_ai_response_streaming(session_id, transcript):
-            full_response += ai_chunk
+    session_id = request.sid
+    
+    # Process audio in a background thread to prevent blocking and timeout
+    def process_audio_async():
+        try:
+            print(f'🔚 Received audio_stream_end for session: {session_id}')
             
-            # Generate speech and animation for each chunk
-            blend_data, audio_filename = generate_speech_and_animation(ai_chunk)
+            # Get accumulated audio from buffer
+            if session_id not in audio_stream_buffers or not audio_stream_buffers[session_id]:
+                print(f'⚠️ No audio data buffered for session: {session_id}')
+                print(f'   Buffer exists: {session_id in audio_stream_buffers}')
+                if session_id in audio_stream_buffers:
+                    print(f'   Buffer length: {len(audio_stream_buffers[session_id])}')
+                socketio.emit('transcription_result', {'transcript': '', 'confidence': 0}, room=session_id)
+                socketio.emit('error', {'message': 'No audio data received. Please speak clearly and try again.'}, room=session_id)
+                return
             
-            # Send chunk immediately to client
-            emit('avatar_speaks_chunk', {
+            print(f'🎧 Processing {len(audio_stream_buffers[session_id])} audio samples for session: {session_id}')
+            
+            # Convert PCM samples to bytes
+            import struct
+            
+            # If audio is too short, inform user
+            audio_samples = audio_stream_buffers[session_id]
+            min_samples = 16000 * 0.2  # 0.2 seconds minimum (very lenient)
+            
+            if len(audio_samples) < min_samples:
+                print(f'⚠️ Audio too short: {len(audio_samples)} samples ({len(audio_samples)/16000:.2f}s) - minimum is {min_samples/16000:.2f}s')
+                # Clear the buffer
+                audio_stream_buffers[session_id] = []
+                socketio.emit('transcription_result', {'transcript': '', 'confidence': 0}, room=session_id)
+                socketio.emit('error', {'message': f'Recording too short ({len(audio_samples)/16000:.1f}s). Please hold the button longer and speak.'}, room=session_id)
+                return
+            
+            # Check if audio has actual content (not just silence)
+            import array
+            audio_array = array.array('h', audio_samples)
+            max_amplitude = max(abs(min(audio_array)), abs(max(audio_array)))
+            print(f'🔊 Audio level check - Max amplitude: {max_amplitude} (threshold: 100)')
+            
+            if max_amplitude < 100:  # Very quiet or silence
+                print(f'⚠️ Audio too quiet - max amplitude: {max_amplitude}')
+                audio_stream_buffers[session_id] = []
+                socketio.emit('transcription_result', {'transcript': '', 'confidence': 0}, room=session_id)
+                socketio.emit('error', {'message': 'Audio is too quiet. Please speak louder and closer to the microphone.'}, room=session_id)
+                return
+            
+            audio_bytes = struct.pack(f'{len(audio_samples)}h', *audio_samples)
+            
+            # Clear the buffer
+            audio_stream_buffers[session_id] = []
+            
+            # Configure Speech-to-Text for LINEAR16 PCM with longer audio support
+            audio = speech.RecognitionAudio(content=audio_bytes)
+            config = speech.RecognitionConfig(
+                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+                sample_rate_hertz=16000,
+                language_code='en-US',
+                enable_automatic_punctuation=True,
+                model='latest_long',  # Use latest_long model for better long audio support
+                use_enhanced=True,
+                profanity_filter=False,
+                enable_word_confidence=True,
+                enable_word_time_offsets=True,
+                speech_contexts=[speech.SpeechContext(
+                    phrases=["interview", "experience", "project", "technology", "software", "developer"]
+                )]
+            )
+            
+            # Transcribe audio with extended timeout
+            print(f'🎯 Sending {len(audio_bytes)} bytes ({len(audio_samples)/16000:.2f}s) to Speech-to-Text API...')
+            
+            try:
+                # For long audio, use recognize with proper timeout handling
+                response = stt_client.recognize(config=config, audio=audio, timeout=300)  # 300 second (5 minute) timeout
+            except Exception as stt_error:
+                print(f'❌ Speech-to-Text API error: {str(stt_error)}')
+                import traceback
+                traceback.print_exc()
+                socketio.emit('error', {'message': 'Speech recognition failed. Please try again.'}, room=session_id)
+                return
+            
+            if not response.results:
+                print('⚠️ No transcription results - audio may be silence or unclear')
+                print(f'   Audio was {len(audio_samples)/16000:.2f}s long with max amplitude {max_amplitude}')
+                socketio.emit('transcription_result', {'transcript': '', 'confidence': 0}, room=session_id)
+                # Ask user to repeat - more specific feedback
+                if max_amplitude < 500:
+                    ai_response = "I can barely hear you. Please speak much louder and closer to your microphone."
+                else:
+                    ai_response = "I didn't quite catch that. Please speak more clearly and a bit slower."
+                
+                # Generate speech and animation for the clarification
+                blend_data, audio_filename = generate_speech_and_animation(ai_response)
+                socketio.emit('avatar_speaks', {
+                    'blendData': blend_data,
+                    'filename': audio_filename,
+                    'transcript': ai_response
+                }, room=session_id)
+                return
+            
+            # Get the transcript
+            transcript = response.results[0].alternatives[0].transcript
+            confidence = response.results[0].alternatives[0].confidence if hasattr(response.results[0].alternatives[0], 'confidence') else 1.0
+            
+            print(f'📝 Transcription: "{transcript}" (confidence: {confidence:.2%})')
+            
+            # Send transcription to client
+            socketio.emit('transcription_result', {
+                'transcript': transcript,
+                'confidence': confidence
+            }, room=session_id)
+            
+            # Process with AI only if transcript has meaningful content
+            if not transcript.strip() or len(transcript.strip()) < 3:
+                print('💭 Very short transcript - asking user to elaborate')
+                ai_response = "I heard you, but could you elaborate a bit more on that?"
+                
+                blend_data, audio_filename = generate_speech_and_animation(ai_response)
+                socketio.emit('avatar_speaks', {
+                    'blendData': blend_data,
+                    'filename': audio_filename,
+                    'transcript': ai_response
+                }, room=session_id)
+                return
+            
+            # Get AI response based on user's answer
+            print(f'🤖 Getting AI response for: "{transcript}"')
+            ai_response = get_ai_response(session_id, transcript)
+            
+            # Generate speech and animation
+            blend_data, audio_filename = generate_speech_and_animation(ai_response)
+            
+            # Send complete response to client
+            socketio.emit('avatar_speaks', {
                 'blendData': blend_data,
                 'filename': audio_filename,
-                'text_chunk': ai_chunk
-            })
+                'transcript': ai_response
+            }, room=session_id)
             
-            print(f'🗣️ AI chunk: {ai_chunk}')
+            print(f'✅ Complete AI response: {ai_response}')
         
-        # Send complete transcript at the end
-        emit('avatar_speaks_complete', {
-            'transcript': full_response
-        })
-        
-        print(f'✅ Complete AI response: {full_response}')
+        except Exception as e:
+            error_msg = f'Error processing audio stream: {str(e)}'
+            print(f'❌ {error_msg}')
+            import traceback
+            traceback.print_exc()
+            socketio.emit('error', {'message': 'Failed to process your audio. Please try again.'}, room=session_id)
+            
+            # Send a fallback response
+            fallback_response = "I'm having some technical difficulties. Could you please try speaking again?"
+            try:
+                blend_data, audio_filename = generate_speech_and_animation(fallback_response)
+                socketio.emit('avatar_speaks', {
+                    'blendData': blend_data,
+                    'filename': audio_filename,
+                    'transcript': fallback_response
+                }, room=session_id)
+            except:
+                pass
     
-    except Exception as e:
-        print(f'Error processing audio stream: {str(e)}')
-        emit('error', {'message': str(e)})
+    # Start background processing with thread
+    socketio.start_background_task(process_audio_async)
 
 
 @socketio.on('text_message')
@@ -627,7 +786,7 @@ if __name__ == '__main__':
     🚀 AI Interviewer Avatar Server Starting...
     📍 Host: 127.0.0.1
     🔌 Port: {port}
-    🤖 AI Model: Gemini 1.5 Flash
+    🤖 AI Model: Gemini 2.5 Flash (via API)
     🎤 Speech-to-Text: Enabled
     🔊 Text-to-Speech: Enabled
     """)
