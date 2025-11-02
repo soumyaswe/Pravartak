@@ -16,11 +16,28 @@ export const useSidebar = () => {
 };
 
 export default function DashboardLayout({ children }) {
-  const [isExpanded, setIsExpanded] = useState(true); // Always open on desktop
+  const [isExpanded, setIsExpanded] = useState(() => {
+    // Initialize from localStorage if available
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sidebar-expanded');
+      return stored !== null ? stored === 'true' : true;
+    }
+    return true;
+  });
   const [isMobileOpen, setIsMobileOpen] = useState(false); // Closed on mobile
 
+  // Sync sidebar state with localStorage for header/footer
+  const handleSetIsExpanded = (value) => {
+    setIsExpanded(value);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar-expanded', value.toString());
+      // Dispatch custom event for same-tab updates
+      window.dispatchEvent(new CustomEvent('sidebar-toggle', { detail: { isExpanded: value } }));
+    }
+  };
+
   return (
-    <SidebarContext.Provider value={{ isExpanded, setIsExpanded, isMobileOpen, setIsMobileOpen }}>
+    <SidebarContext.Provider value={{ isExpanded, setIsExpanded: handleSetIsExpanded, isMobileOpen, setIsMobileOpen }}>
       <div className="min-h-screen bg-background relative">
         {/* Background Logo Text - Hidden when sidebar is visible */}
         <div 

@@ -6,10 +6,25 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const firebaseUserId = searchParams.get("userId");
 
+    console.log("Dashboard stats request for user:", firebaseUserId);
+
     if (!firebaseUserId) {
+      console.error("No user ID provided");
       return NextResponse.json(
         { error: "User ID required" },
         { status: 400 }
+      );
+    }
+
+    // Test database connection
+    try {
+      await db.$connect();
+      console.log("Database connected successfully");
+    } catch (dbError) {
+      console.error("Database connection error:", dbError);
+      return NextResponse.json(
+        { error: "Database connection failed", details: dbError.message },
+        { status: 500 }
       );
     }
 
@@ -22,35 +37,64 @@ export async function GET(request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      // Return default stats for new users
+      console.log("User not found in database, returning default stats");
+      return NextResponse.json({
+        stats: {
+          profileCompletion: 0,
+          documentsCreated: 0,
+          interviewSessions: 0,
+          resumeCount: 0,
+          coverLetterCount: 0,
+          mockInterviewCount: 0,
+          interviewPrepCount: 0,
+          jobApplicationCount: 0,
+          activeDays: 0,
+          latestMockScore: null,
+          recentActivity: [],
+          jobApplicationsByStatus: []
+        }
+      });
     }
 
-    // Get counts
-    const [
-      resumeCount,
-      coverLetterCount,
-      mockInterviewCount,
-      interviewPrepCount,
-      jobApplicationCount,
-      recentActivity,
-    ] = await Promise.all([
-      db.resume.count({ where: { userId: user.id } }),
-      db.coverLetter.count({ where: { userId: user.id } }),
-      db.mockInterview.count({ where: { userId: user.id } }),
-      db.interviewPrep.count({ where: { userId: user.id } }),
-      db.jobApplication.count({ where: { userId: user.id } }),
-      db.userActivity.findMany({
-        where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        select: {
-          id: true,
-          activityType: true,
-          description: true,
-          createdAt: true,
-        },
-      }),
-    ]);
+    // Get counts with error handling
+    let resumeCount = 0;
+    let coverLetterCount = 0;
+    let mockInterviewCount = 0;
+    let interviewPrepCount = 0;
+    let jobApplicationCount = 0;
+    let recentActivity = [];
+
+    try {
+      [
+        resumeCount,
+        coverLetterCount,
+        mockInterviewCount,
+        interviewPrepCount,
+        jobApplicationCount,
+        recentActivity,
+      ] = await Promise.all([
+        db.resume.count({ where: { userId: user.id } }).catch(() => 0),
+        db.coverLetter.count({ where: { userId: user.id } }).catch(() => 0),
+        db.mockInterview.count({ where: { userId: user.id } }).catch(() => 0),
+        db.interviewPrep.count({ where: { userId: user.id } }).catch(() => 0),
+        db.jobApplication.count({ where: { userId: user.id } }).catch(() => 0),
+        db.userActivity.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          select: {
+            id: true,
+            activityType: true,
+            description: true,
+            createdAt: true,
+          },
+        }).catch(() => []),
+      ]);
+    } catch (error) {
+      console.error("Error fetching counts:", error);
+      // Continue with default values
+    }
 
     // Calculate profile completion
     const profile = user.profile;
@@ -81,33 +125,65 @@ export async function GET(request) {
     // Calculate interview sessions
     const interviewSessions = mockInterviewCount + interviewPrepCount;
 
-    // Get latest mock interview score
-    const latestMockInterview = await db.mockInterview.findFirst({
-      where: { userId: user.id, overallScore: { not: null } },
-      orderBy: { completedAt: "desc" },
-      select: { overallScore: true },
-    });
+    // Get latest assessment (interview practice quiz) score
+    let latestScore = null;
+    try {
+      console.log("Fetching assessments for user.id:", user.id);
+      
+      // First, check if any assessments exist for this user
+      const allAssessments = await db.assessment.findMany({
+        where: { userId: user.id },
+        select: { id: true, quizScore: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      });
+      
+      console.log(`Found ${allAssessments.length} assessments for user:`, allAssessments);
+      
+      const latestAssessment = await db.assessment.findFirst({
+        where: { userId: user.id, quizScore: { not: null } },
+        orderBy: { createdAt: "desc" },
+        select: { quizScore: true, createdAt: true },
+      });
+      
+      if (latestAssessment?.quizScore != null) {
+        latestScore = latestAssessment.quizScore;
+        console.log("✅ Latest assessment score found:", latestScore, "from", latestAssessment.createdAt);
+      } else {
+        console.log("❌ No assessment scores found for user");
+      }
+    } catch (error) {
+      console.error("Error fetching latest assessment:", error);
+    }
 
     // Get active days (days with activity)
-    const firstActivity = await db.userActivity.findFirst({
-      where: { userId: user.id },
-      orderBy: { createdAt: "asc" },
-    });
-
     let activeDays = 0;
-    if (firstActivity) {
-      const daysSinceFirst = Math.floor(
-        (Date.now() - firstActivity.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      activeDays = Math.min(daysSinceFirst + 1, 30); // Cap at 30 for display
+    try {
+      const firstActivity = await db.userActivity.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: "asc" },
+      });
+
+      if (firstActivity) {
+        const daysSinceFirst = Math.floor(
+          (Date.now() - firstActivity.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        activeDays = Math.min(daysSinceFirst + 1, 30); // Cap at 30 for display
+      }
+    } catch (error) {
+      console.error("Error calculating active days:", error);
     }
 
     // Get application status breakdown
-    const jobApplicationsByStatus = await db.jobApplication.groupBy({
-      by: ["status"],
-      where: { userId: user.id },
-      _count: true,
-    });
+    let jobApplicationsByStatus = [];
+    try {
+      jobApplicationsByStatus = await db.jobApplication.groupBy({
+        by: ["status"],
+        where: { userId: user.id },
+        _count: true,
+      });
+    } catch (error) {
+      console.error("Error fetching job applications by status:", error);
+    }
 
     const stats = {
       profileCompletion,
@@ -119,7 +195,7 @@ export async function GET(request) {
       interviewPrepCount,
       jobApplicationCount,
       activeDays,
-      latestMockScore: latestMockInterview?.overallScore || null,
+      latestMockScore: latestScore,
       recentActivity,
       jobApplicationsByStatus: jobApplicationsByStatus.map((item) => ({
         status: item.status,
@@ -130,9 +206,24 @@ export async function GET(request) {
     return NextResponse.json({ stats });
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch dashboard stats" },
-      { status: 500 }
-    );
+    console.error("Error details:", error.message, error.stack);
+    
+    // Return default stats on error instead of failing completely
+    return NextResponse.json({
+      stats: {
+        profileCompletion: 0,
+        documentsCreated: 0,
+        interviewSessions: 0,
+        resumeCount: 0,
+        coverLetterCount: 0,
+        mockInterviewCount: 0,
+        interviewPrepCount: 0,
+        jobApplicationCount: 0,
+        activeDays: 0,
+        latestMockScore: null,
+        recentActivity: [],
+        jobApplicationsByStatus: []
+      }
+    });
   }
 }

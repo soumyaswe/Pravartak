@@ -1,9 +1,6 @@
-import ProfileView from "./components/profile-view";
+"use client";
 
-export const metadata = {
-  title: "Profile | Pravartak",
-  description: "View and update your profile information",
-};
+import ProfileView from "./components/profile-view";
 
 const ProfilePage = () => {
   return <ProfileView />;

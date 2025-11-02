@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "pravartak-15665",
+  "private_key_id": "3d850908802b42fac0fa389fb11386b53c608b1f",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCs4jXSsZ0P9dPz\nPurHuGBSxuWo8XWOlonNENGNEaM2c0ynlJQuhikCTYlT6IRngBY10CzWvk25UXD5\nziC/I9MIqCwlC569vnjEfZYDs2Ne6r05W5kCExA/DiU6zZIU1lHdDMRb63mWFeQo\nke/4Uqul5necBv2o0KZKiTqToc6L34QDQw0k9Lm7o9OU1paMoQF5wYgUPrI7cnBD\nwz2JDD3HqytCOixKAdMINhYVjLgfvUJS7AYRRKwY+eYRjFimyldIEJdUw3Gc4hHf\nIhMpSkT8mBHWQ6F2at9RH/VCdTaTb0JbhFMjbjbneU5OEhxUG6HwwSPm+VkWF6J0\nHzYdutOjAgMBAAECggEAVZKWn5Zorri4U4OGBJt/mhl3Hdt+m7hptwYnIxNi3RXP\nEHfbrPedHtWwLsc9mlltJO/I8fY6VIs6R3u++71IvNU5HJEW3saD0oZzFZvaiOXa\nCaUMJFm5RezDgsq0DvpShP7HxtPUV/S3/VjXFewdqD1eYO2Y6tF0Lhqk0uRZbyPA\nWBNrnUZbeBKialu1mo9fVDnN+o9GJvgYqzq6irkaS6EMdNC2L5sj8qhMQ22ylE9x\nfUR//qT34xNtBWf3AWSMzTFwbMF/os8IAXR9MpeCOvjSnmOVmicLh4amk+8Pek3C\nrlZecmSxOnaS/UNdEoq3SQOlHHDpdm/q+4RJhpnn0QKBgQDT+lPVEeOvquAgP695\ni9mF28hwANadWrCUbdRhVhj68yX450k+uYwdcToUychnY2jw6rhAa5r2DECbuihJ\npKo73lxyqqvosUqA+G7E8cxEQqby8qGnoucBeByKlfJj0klwi9vw4usQRWfh7XNe\nJIlWeitpQTHOKOlWVTt15N6fOQKBgQDQyXaMiMOdkwxdH5Ur9rGbnQRephKNnp1a\nu3H7rvi+4+4d3ImyOU0H7QSlqsyoKQWlmS2tdTM4bcANh2uJaALf4zf+Uyg9EgUA\njrgtbxFwCRRsco7u5fP2m4L6Vpq9Z4sH/LYV5r4jAGxXKGeLo9eR3hXl1JnXp7Ly\nOvllxputuwKBgQDRWfhzhXB97N/fWaZe/2x8VDzXySwsSgX9AZ9v5k1TgtIsyZfA\nGBY2eb3oDAUdfsOEs/v2u49Wk3E3m5nwaW0rJYfeQ4r2jCpNx432eevIOp+Rb2mS\nG0PUYqClikPSrDuVqLs2Y5XOAw3+xrla7/CndI7tK9MZjbQtbI4F+FyZmQKBgGAJ\nGwd/bQMQ/XHkMhhby8w5SCZFG2ma2ORALijHjdE4RHHl3ExnQQBxTF7rlmGPJPLL\n54/OxfWhveI7NQKqHhBfkoTgOTUGEdj0zNDRMuMmugc8FnTavwHi/DcsGNcgRnox\nCow+a5zr9+mLQz2e6mxFDCuARBdHIu96ovbmiPs7AoGAJhhNaZYy0zogmjU0TuMh\n81mCDdS4lNX25l9iz4loBfknO8N01+n4gcLVAbcPAQLCjl9LlV6MOB6PvvhzWs/l\n+oH5iVRRkBxofmpp7PCep/T8RJ6AB2SMktNobkTc+KOkQSKhmWebbu4hFGYiREkM\nZcDVGXGyXHqoCwy9Ug5gkN0=\n-----END PRIVATE KEY-----\n",
+  "client_email": "pravartak@pravartak-15665.iam.gserviceaccount.com",
+  "client_id": "107249822632243637043",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/pravartak%40pravartak-15665.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

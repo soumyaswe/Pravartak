@@ -4,6 +4,7 @@ import { db } from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { revalidatePath } from "next/cache";
+import { calculateProfileProgress } from "./profile-progress";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Using 2.5-flash
@@ -28,6 +29,15 @@ export async function createResume(content) {
 
     revalidatePath("/resume"); // Revalidates the builder page
     revalidatePath("/resume/my-resumes"); // Revalidates the list page
+    revalidatePath("/dashboard");
+    
+    // Recalculate profile progress
+    try {
+      await calculateProfileProgress();
+    } catch (error) {
+      console.error("Error calculating profile progress:", error);
+    }
+    
     return resume;
   } catch (error) {
     console.error("Error creating resume:", error);

@@ -34,13 +34,13 @@ export default function PersonalizedHeader() {
             </div>
             
             {/* Progress Bar */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-foreground">Career Progress</span>
                 <span className="text-sm text-muted-foreground">{userData.careerProgress}% complete</span>
               </div>
               <Progress value={userData.careerProgress} className="h-2" />
-            </div>
+            </div> */}
           </div>
           
           {/* Right Section - Next Action */}
@@ -64,7 +64,7 @@ export default function PersonalizedHeader() {
         </div>
         
         {/* Quick Stats Row */}
-        <div className="mt-6 pt-6 border-t border-border/50">
+        {/* <div className="mt-6 pt-6 border-t border-border/50">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-primary">12</p>
@@ -82,8 +82,8 @@ export default function PersonalizedHeader() {
               <p className="text-2xl font-bold text-orange-500">5</p>
               <p className="text-xs text-muted-foreground">Skills Improved</p>
             </div>
-          </div>
-        </div>
+          </div> 
+        </div>*/}
       </CardContent>
     </Card>
   );

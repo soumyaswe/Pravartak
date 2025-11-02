@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -33,6 +34,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useEffect, useRef, Suspense } from "react";
 import { suppressSplineWarnings } from "@/lib/suppress-spline-warnings";
+import { useAuth } from "@/contexts/auth-context";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -41,6 +43,15 @@ export default function LandingPage() {
   const testimonialHeadingRef = useRef(null);
   const faqRef = useRef(null);
   const howItWorksRef = useRef(null);
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, loading, router]);
 
   // Suppress Spline runtime warnings
   useEffect(() => {
@@ -49,106 +60,142 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    if (headingRef.current) {
-      const words = headingRef.current.querySelectorAll(".word");
+    // Don't run animations if user is logged in (will redirect)
+    if (loading || user) return;
 
-      gsap.fromTo(
-        words,
-        {
-          opacity: 0,
-          x: -50,
-        },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 2,
-          stagger: 0.5,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: headingRef.current,
-            start: "top 80%",
-            end: "top 30%",
-            scrub: 2,
-          },
+    // Small delay to ensure DOM is fully rendered
+    const timer = setTimeout(() => {
+      if (headingRef.current) {
+        const words = headingRef.current.querySelectorAll(".word");
+        if (words.length > 0) {
+          gsap.fromTo(
+            words,
+            {
+              opacity: 0,
+              x: -50,
+            },
+            {
+              opacity: 1,
+              x: 0,
+              duration: 2,
+              stagger: 0.5,
+              ease: "power2.out",
+              scrollTrigger: {
+                trigger: headingRef.current,
+                start: "top 80%",
+                end: "top 30%",
+                scrub: 2,
+              },
+            }
+          );
         }
-      );
-    }
+      }
 
-    if (testimonialHeadingRef.current) {
-      const words = testimonialHeadingRef.current.querySelectorAll(".word");
-
-      gsap.fromTo(
-        words,
-        {
-          opacity: 0,
-          x: -50,
-        },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 2,
-          stagger: 0.5,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: testimonialHeadingRef.current,
-            start: "top 80%",
-            end: "top 30%",
-            scrub: 2,
-          },
+      if (testimonialHeadingRef.current) {
+        const words = testimonialHeadingRef.current.querySelectorAll(".word");
+        if (words.length > 0) {
+          gsap.fromTo(
+            words,
+            {
+              opacity: 0,
+              x: -50,
+            },
+            {
+              opacity: 1,
+              x: 0,
+              duration: 2,
+              stagger: 0.5,
+              ease: "power2.out",
+              scrollTrigger: {
+                trigger: testimonialHeadingRef.current,
+                start: "top 80%",
+                end: "top 30%",
+                scrub: 2,
+              },
+            }
+          );
         }
-      );
-    }
+      }
 
-    if (faqRef.current) {
-      const words = faqRef.current.querySelectorAll(".word");
-
-      gsap.fromTo(
-        words,
-        {
-          opacity: 0,
-          x: -50,
-        },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 2,
-          stagger: 0.5,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: faqRef.current,
-            start: "top 80%",
-            end: "top 30%",
-            scrub: 2,
-          },
+      if (faqRef.current) {
+        const words = faqRef.current.querySelectorAll(".word");
+        if (words.length > 0) {
+          gsap.fromTo(
+            words,
+            {
+              opacity: 0,
+              x: -50,
+            },
+            {
+              opacity: 1,
+              x: 0,
+              duration: 2,
+              stagger: 0.5,
+              ease: "power2.out",
+              scrollTrigger: {
+                trigger: faqRef.current,
+                start: "top 80%",
+                end: "top 30%",
+                scrub: 2,
+              },
+            }
+          );
         }
-      );
-    }
+      }
 
-    if (howItWorksRef.current) {
-      const words = howItWorksRef.current.querySelectorAll(".word");
-
-      gsap.fromTo(
-        words,
-        {
-          opacity: 0,
-          x: -50,
-        },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 2,
-          stagger: 0.5,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: howItWorksRef.current,
-            start: "top 80%",
-            end: "top 30%",
-            scrub: 2,
-          },
+      if (howItWorksRef.current) {
+        const words = howItWorksRef.current.querySelectorAll(".word");
+        if (words.length > 0) {
+          gsap.fromTo(
+            words,
+            {
+              opacity: 0,
+              x: -50,
+            },
+            {
+              opacity: 1,
+              x: 0,
+              duration: 2,
+              stagger: 0.5,
+              ease: "power2.out",
+              scrollTrigger: {
+                trigger: howItWorksRef.current,
+                start: "top 80%",
+                end: "top 30%",
+                scrub: 2,
+              },
+            }
+          );
         }
-      );
-    }
-  }, []);
+      }
+
+      // Refresh ScrollTrigger after all animations are set up
+      ScrollTrigger.refresh();
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      // Clean up ScrollTrigger instances
+      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+    };
+  }, [loading, user]);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render landing page if user is authenticated (will redirect)
+  if (user) {
+    return null;
+  }
 
   return (
     <>
@@ -158,7 +205,7 @@ export default function LandingPage() {
       <HeroSection />
 
       {/* Features Section */}
-      <section className="w-full py-12 sm:py-16 md:py-20 lg:py-28 xl:py-36 bg-background">
+      <section id="features" className="w-full py-12 sm:py-16 md:py-20 lg:py-28 xl:py-36 bg-background scroll-mt-20">
         <div className="mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
           {/* Heading - Full Screen */}
           <div className="min-w-full h-full flex items-center justify-center snap-center px-4 sm:px-6 md:px-8 flex-shrink-0">
@@ -292,7 +339,7 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works Section */}
-      <section className="w-full py-8 sm:py-8 md:py-12 lg:py-16 bg-background">
+      <section id="how-it-works" className="w-full py-8 sm:py-8 md:py-12 lg:py-16 bg-background scroll-mt-20">
         <div className="mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
           <div className="text-center max-w-6xl mx-auto mb-8 sm:mb-10 md:mb-12">
             <h2
@@ -451,7 +498,7 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="w-full py-8 sm:py-12 md:py-16 lg:py-24">
+      <section id="faqs" className="w-full py-8 sm:py-12 md:py-16 lg:py-24 scroll-mt-20">
         <div className="mx-auto px-4 sm:px-6 md:px-8">
           <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10 md:mb-12">
             <div ref={faqRef}>
