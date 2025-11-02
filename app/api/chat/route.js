@@ -39,19 +39,25 @@ let genAI;
 let textModel;
 let visionModel;
 
-try {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY environment variable is not set");
-  }
+// Defer initialization until runtime, not during build
+const initializeGemini = () => {
+  if (genAI) return; // Already initialized
   
-  genAI = new GoogleGenerativeAI(apiKey);
-  textModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
-  visionModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
-  console.log("Gemini API configured successfully.");
-} catch (error) {
-  console.error("Error configuring Gemini API:", error);
-}
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY environment variable is not set");
+      return;
+    }
+    
+    genAI = new GoogleGenerativeAI(apiKey);
+    textModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    visionModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    console.log("Gemini API configured successfully.");
+  } catch (error) {
+    console.error("Error configuring Gemini API:", error);
+  }
+};
 
 // Helper function to detect if a message seems incomplete or fragmented
 function isMessageIncomplete(message) {
@@ -101,6 +107,9 @@ function buildConversationContext(messageHistory, currentMessage) {
 
 export async function POST(request) {
   try {
+    // Initialize Gemini on first request
+    initializeGemini();
+    
     // Check if API is configured
     if (!textModel || !visionModel) {
       return NextResponse.json(

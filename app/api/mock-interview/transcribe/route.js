@@ -3,12 +3,30 @@ import speech from '@google-cloud/speech';
 import path from 'path';
 
 // Initialize the Google Cloud Speech client
-const client = new speech.SpeechClient({
-  keyFilename: path.resolve(process.cwd(), process.env.GOOGLE_APPLICATION_CREDENTIALS)
-});
+let client;
+try {
+  const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!credentialsPath) {
+    console.error('GOOGLE_APPLICATION_CREDENTIALS is not set');
+  } else {
+    client = new speech.SpeechClient({
+      keyFilename: path.resolve(process.cwd(), credentialsPath)
+    });
+  }
+} catch (error) {
+  console.error('Failed to initialize Speech client:', error);
+}
 
 export async function POST(request) {
   try {
+    // Check if client is initialized
+    if (!client) {
+      return NextResponse.json(
+        { error: 'Speech-to-text service is not configured. Please set GOOGLE_APPLICATION_CREDENTIALS.' },
+        { status: 500 }
+      );
+    }
+
     const formData = await request.formData();
     const audioFile = formData.get('audio');
 

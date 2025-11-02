@@ -43,7 +43,8 @@ const dashboardNavigation = [
     section: "Interview Prep",
     items: [
       { name: "Practice Questions", icon: MessageCircle, href: "/interview" },
-      { name: "Mock Interviews", icon: Video, href: "/mock-interview" }
+      { name: "Mock Interviews", icon: Video, href: "/mock-interview" },
+      { name: "Interview Simulator", icon: Video, href: "/interview-simulator" }
     ]
   },
   {

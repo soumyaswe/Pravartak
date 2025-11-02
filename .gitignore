@@ -32,7 +32,25 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# Google Cloud credentials (NEVER commit these!)
+*credentials*.json
 flash-precept-471409-u3-0a2cc0ca3940.json
+gcp-credentials.json
+
+# Backend environment and credentials
+backend/.env
+backend/gcp-credentials.json
+backend/audio_files/
+backend/__pycache__/
+
+# Python virtual environments
+backend/venv/
+backend/.venv/
+venv/
+.venv/
+*.pyc
 
 # Firebase Admin SDK service account keys (NEVER commit these!)
 adminkey.json
@@ -68,6 +86,12 @@ docs/
 DATA_FLOW_GUIDE.md
 MISSING_FEATURES_GUIDE.md
 FIREBASE_ENV_SETUP.md
+
+# Setup and documentation files (keep these)
+!INTERVIEW_SIMULATOR_SETUP.md
+!INTERVIEW_SIMULATOR_API_CONFIG.md
+!INTEGRATION_COMPLETE.md
+!setup-backend.ps1
 
 # Migration scripts (no longer needed)
 scripts/cleanup-and-setup.ps1
