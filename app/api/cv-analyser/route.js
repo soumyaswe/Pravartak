@@ -77,21 +77,30 @@ function formatAnalysisOutput(rawAnalysis) {
 let genAI;
 let model;
 
-try {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY environment variable is not set");
-  }
+// Defer initialization until runtime
+const initializeGemini = () => {
+  if (genAI) return; // Already initialized
   
-  genAI = new GoogleGenerativeAI(apiKey);
-  model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-  console.log("Gemini API configured successfully for CV analysis.");
-} catch (error) {
-  console.error("Error configuring Gemini API for CV analysis:", error);
-}
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY environment variable is not set");
+      return;
+    }
+    
+    genAI = new GoogleGenerativeAI(apiKey);
+    model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    console.log("Gemini API configured successfully for CV analysis.");
+  } catch (error) {
+    console.error("Error configuring Gemini API for CV analysis:", error);
+  }
+};
 
 export async function POST(request) {
   try {
+    // Initialize Gemini on first request
+    initializeGemini();
+    
     // Check if API is configured
     if (!model) {
       return NextResponse.json(

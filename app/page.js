@@ -32,6 +32,7 @@ import SplitText from "@/components/SplitText";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useEffect, useRef, Suspense } from "react";
+import { suppressSplineWarnings } from "@/lib/suppress-spline-warnings";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -40,6 +41,12 @@ export default function LandingPage() {
   const testimonialHeadingRef = useRef(null);
   const faqRef = useRef(null);
   const howItWorksRef = useRef(null);
+
+  // Suppress Spline runtime warnings
+  useEffect(() => {
+    const restore = suppressSplineWarnings();
+    return restore; // Cleanup on unmount
+  }, []);
 
   useEffect(() => {
     if (headingRef.current) {
@@ -364,7 +371,15 @@ export default function LandingPage() {
               >
                 <Spline
                   scene="https://prod.spline.design/Sl5BVKi6MUgfA6xZ/scene.splinecode"
-                  onError={(error) => console.log("Spline Error:", error)}
+                  onLoad={() => {
+                    // Spline loaded successfully - suppress non-critical warnings
+                  }}
+                  onError={(error) => {
+                    // Only log actual errors, suppress timeline warnings
+                    if (error && !error.toString().includes('Missing property')) {
+                      console.warn("Spline:", error);
+                    }
+                  }}
                 />
               </Suspense>
             </div>
