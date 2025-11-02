@@ -78,13 +78,18 @@ export default function ActivityAndRecommendations() {
 
   useEffect(() => {
     async function fetchActivities() {
-      if (!user?.uid) return;
+      if (!user?.uid) {
+        setLoading(false);
+        return;
+      }
       
       try {
         const { stats } = await getDashboardStats(user.uid);
         setActivities(stats.recentActivity || []);
       } catch (error) {
-        console.error('Error fetching activities:', error);
+        console.error('Failed to fetch dashboard stats:', error);
+        // Set empty activities on error
+        setActivities([]);
       } finally {
         setLoading(false);
       }
@@ -132,7 +137,7 @@ export default function ActivityAndRecommendations() {
           ) : (
             <div className="space-y-4">
               {activities.map((activity, index) => {
-                const Icon = getActivityIcon(activity.type);
+                const Icon = getActivityIcon(activity.activityType);
                 
                 return (
                   <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
@@ -142,14 +147,14 @@ export default function ActivityAndRecommendations() {
                     
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground text-sm">
-                        {getActivityTypeLabel(activity.type)}
+                        {getActivityTypeLabel(activity.activityType)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {getTimeAgo(activity.timestamp)}
+                        {getTimeAgo(activity.createdAt)}
                       </p>
-                      {activity.metadata?.title && (
+                      {activity.description && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {activity.metadata.title}
+                          {activity.description}
                         </p>
                       )}
                     </div>
@@ -158,48 +163,6 @@ export default function ActivityAndRecommendations() {
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* AI Recommendations */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Lightbulb className="h-5 w-5 text-primary" />
-            AI Recommendations
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {aiRecommendations.map((recommendation, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                <Badge 
-                  className={`${getPriorityColor(recommendation.priority)} text-white text-xs mt-1`}
-                >
-                  {recommendation.priority}
-                </Badge>
-                
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground text-sm mb-1">
-                    {recommendation.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {recommendation.description}
-                  </p>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 px-2 text-xs text-primary hover:text-primary"
-                    asChild
-                  >
-                    <a href={recommendation.href}>
-                      Take Action <ArrowRight className="h-3 w-3 ml-1" />
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
         </CardContent>
       </Card>
     </div>

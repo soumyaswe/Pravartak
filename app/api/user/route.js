@@ -62,19 +62,76 @@ export async function POST(request) {
 
     console.log('Creating new user with email:', email);
 
-    const newUser = await db.user.create({
-      data: {
-        firebaseUserId: firebaseUser.uid,
-        name: name,
-        imageUrl: firebaseUser.photoURL || "",
-        email: email,
-      },
-    });
+    try {
+      // Use upsert to handle both firebaseUserId and update
+      const newUser = await db.user.upsert({
+        where: {
+          firebaseUserId: firebaseUser.uid,
+        },
+        update: {
+          name: name,
+          imageUrl: firebaseUser.photoURL || "",
+          // Don't update email to avoid conflicts
+        },
+        create: {
+          firebaseUserId: firebaseUser.uid,
+          name: name,
+          imageUrl: firebaseUser.photoURL || "",
+          email: email,
+        },
+      });
 
-    console.log('User created successfully:', newUser.id);
-    return NextResponse.json({ user: newUser });
+      console.log('User created/updated successfully:', newUser.id);
+      return NextResponse.json({ user: newUser });
+    } catch (upsertError) {
+      // If upsert fails due to email constraint, try to find by email
+      if (upsertError.code === 'P2002') {
+        console.log('Unique constraint error, checking by email...');
+        
+        // Check if a user with this email exists but different firebaseUserId
+        const userByEmail = await db.user.findUnique({
+          where: { email: email }
+        });
+        
+        if (userByEmail && userByEmail.firebaseUserId !== firebaseUser.uid) {
+          // Update the existing user's firebaseUserId
+          const updatedUser = await db.user.update({
+            where: { email: email },
+            data: {
+              firebaseUserId: firebaseUser.uid,
+              name: name,
+              imageUrl: firebaseUser.photoURL || "",
+            }
+          });
+          console.log('Updated existing user with new firebaseUserId:', updatedUser.id);
+          return NextResponse.json({ user: updatedUser });
+        }
+      }
+      throw upsertError;
+    }
   } catch (error) {
-    console.error("Error in user API:", error);
+    // Only log detailed errors in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error("Error in user API:", error.code, error.message);
+    }
+    
+    // Final fallback: try to retrieve user by firebaseUserId
+    if (error.code === 'P2002' && requestData?.firebaseUser?.uid) {
+      try {
+        const existingUser = await db.user.findUnique({
+          where: {
+            firebaseUserId: requestData.firebaseUser.uid,
+          },
+        });
+        if (existingUser) {
+          console.log('Found existing user in final fallback:', existingUser.id);
+          return NextResponse.json({ user: existingUser });
+        }
+      } catch (retryError) {
+        console.error('Final fallback failed:', retryError.message);
+      }
+    }
+    
     return NextResponse.json(
       { error: `Failed to create/check user: ${error.message}` },
       { status: 500 }

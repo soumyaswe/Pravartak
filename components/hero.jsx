@@ -30,35 +30,15 @@ const HeroSection = () => {
       <div className="flex flex-col justify-center items-center h-full space-y-6 sm:space-y-8 md:space-y-12 text-center relative z-20 pointer-events-none px-4 sm:px-6">
         <div className="space-y-4 sm:space-y-6 md:space-y-8 mx-auto w-full max-w-7xl">
           <div className="space-y-1 sm:space-y-2">
-            <SplitText
-              text="Your AI Career Coach for"
-              className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-center"
-              delay={10}
-              duration={2}
-              ease="power3.out"
-              splitType="chars"
-              from={{ opacity: 0, y: 40 }}
-              to={{ opacity: 1, y: 0 }}
-              threshold={0.1}
-              rootMargin="-100px"
-              textAlign="center"
-            />
-            
-            <SplitText
-              text="Professional Success"
-              className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-center"
-              delay={10}
-              duration={2}
-              ease="power3.out"
-              splitType="chars"
-              from={{ opacity: 0, y: 40 }}
-              to={{ opacity: 1, y: 0 }}
-              threshold={0.1}
-              rootMargin="-100px"
-              textAlign="center"
-            />
+            <h1 className="text-4xl font-bold md:text-5xl lg:text-6xl xl:text-7xl gradient-title animate-gradient drop-shadow-lg">
+              Your AI Career Coach for
+              <br />
+              <span className="text-white drop-shadow-xl">
+                Professional Success
+              </span>
+            </h1>
           </div>
-          
+
           <div className="mx-auto max-w-[95%] sm:max-w-[90%] md:max-w-[800px] text-white/90 text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl leading-relaxed drop-shadow-md font-medium">
             <div className="flex flex-wrap justify-center items-center gap-x-1 sm:gap-x-2">
               <span className="whitespace-nowrap sm:text-base md:text-xl lg:text-2xl xl:text-3xl">

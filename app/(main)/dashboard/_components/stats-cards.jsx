@@ -5,21 +5,74 @@ import { Card, CardContent } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, FileText, CheckCircle, Target, MessageCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getDashboardStats } from '@/lib/data-helpers';
+import { getAssessments } from '@/actions/interview';
+import { calculateProfileProgress } from '@/actions/profile-progress';
+import { getActivityCounts } from '@/actions/activity-counters';
 
 export default function StatsCards() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [assessments, setAssessments] = useState([]);
+  const [profileCompletion, setProfileCompletion] = useState(null);
+  const [activityCounts, setActivityCounts] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const getLatestAssessment = () => {
+    if (!assessments?.length) return null;
+    // Sort by createdAt to ensure we get the most recent one
+    const sorted = [...assessments].sort((a, b) => 
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
+    return sorted[0];
+  };
 
   useEffect(() => {
     async function fetchStats() {
-      if (!user?.uid) return;
+      if (!user?.uid) {
+        setLoading(false);
+        return;
+      }
       
       try {
-        const { stats: dashboardStats } = await getDashboardStats(user.uid);
-        setStats(dashboardStats);
+        // Fetch all data in parallel
+        const [dashboardStatsResult, assessmentsData, profileProgress, counts] = await Promise.all([
+          getDashboardStats(user.uid),
+          getAssessments(),
+          calculateProfileProgress(),
+          getActivityCounts()
+        ]);
+        
+        console.log('Profile progress data received:', profileProgress);
+        console.log('Assessments data received:', assessmentsData);
+        console.log('Dashboard stats received:', dashboardStatsResult);
+        console.log('Activity counts received:', counts);
+        
+        setStats(dashboardStatsResult.stats);
+        setAssessments(assessmentsData || []);
+        setProfileCompletion(profileProgress);
+        setActivityCounts(counts);
       } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
+        console.error('Failed to fetch dashboard stats:', error);
+        console.error('Error details:', error.message, error.stack);
+        
+        // Set default stats on error
+        setStats({
+          profileCompletion: 0,
+          documentsCreated: 0,
+          interviewSessions: 0,
+          latestMockScore: null
+        });
+        setAssessments([]);
+        setProfileCompletion({
+          completionPercentage: 0,
+          completedCount: 0,
+          totalCount: 0,
+          error: error.message
+        });
+        setActivityCounts({
+          documentsCreated: 0,
+          interviewSessions: 0
+        });
       } finally {
         setLoading(false);
       }
@@ -42,30 +95,37 @@ export default function StatsCards() {
     );
   }
 
+  // Get latest assessment score
+  const latestAssessment = getLatestAssessment();
+  const latestScore = latestAssessment?.quizScore;
+  
+  // Get profile completion percentage from comprehensive calculation
+  const completionPercentage = profileCompletion?.completionPercentage || 0;
+
   const careerStatsData = [
     {
       title: 'Profile Completion',
-      value: `${stats?.profileCompletion || 0}%`,
+      value: `${completionPercentage}%`,
       icon: CheckCircle,
-      color: stats?.profileCompletion >= 80 ? 'text-green-500' : stats?.profileCompletion >= 50 ? 'text-yellow-500' : 'text-red-500'
+      color: completionPercentage >= 80 ? 'text-green-500' : completionPercentage >= 50 ? 'text-yellow-500' : 'text-red-500'
     },
     {
       title: 'Documents Created',
-      value: stats?.documentsCreated || 0,
+      value: activityCounts?.documentsCreated || 0,
       icon: FileText,
       color: 'text-blue-500'
     },
     {
       title: 'Interview Sessions',
-      value: stats?.interviewSessions || 0,
+      value: activityCounts?.interviewSessions || 0,
       icon: MessageCircle,
       color: 'text-purple-500'
     },
     {
-      title: 'Latest Mock Score',
-      value: stats?.latestMockScore ? `${stats.latestMockScore.toFixed(1)}/100` : 'N/A',
+      title: 'Latest Practice Score',
+      value: latestScore != null ? `${latestScore.toFixed(1)}%` : 'N/A',
       icon: Target,
-      color: stats?.latestMockScore >= 70 ? 'text-green-500' : stats?.latestMockScore >= 50 ? 'text-yellow-500' : 'text-orange-500'
+      color: latestScore >= 70 ? 'text-green-500' : latestScore >= 50 ? 'text-yellow-500' : 'text-orange-500'
     }
   ];
 
