@@ -1,4 +1,5 @@
-import React from "react";
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,8 +22,127 @@ import { features } from "@/data/features";
 import { testimonial } from "@/data/testimonial";
 import { faqs } from "@/data/faqs";
 import { howItWorks } from "@/data/howItWorks";
+import CountUp from "@/components/CountUp";
+import BlurText from "@/components/BlurText";
+import TracingBeam from "@/components/ui/tracing-beam";
+import Spline from "@splinetool/react-spline";
+import SpotlightCard from "@/components/SpotlightCard";
+import StarBorder from "@/components/StarBorder";
+import SplitText from "@/components/SplitText";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useEffect, useRef, Suspense } from "react";
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function LandingPage() {
+  const headingRef = useRef(null);
+  const testimonialHeadingRef = useRef(null);
+  const faqRef = useRef(null);
+  const howItWorksRef = useRef(null);
+
+  useEffect(() => {
+    if (headingRef.current) {
+      const words = headingRef.current.querySelectorAll(".word");
+
+      gsap.fromTo(
+        words,
+        {
+          opacity: 0,
+          x: -50,
+        },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 2,
+          stagger: 0.5,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: headingRef.current,
+            start: "top 80%",
+            end: "top 30%",
+            scrub: 2,
+          },
+        }
+      );
+    }
+
+    if (testimonialHeadingRef.current) {
+      const words = testimonialHeadingRef.current.querySelectorAll(".word");
+
+      gsap.fromTo(
+        words,
+        {
+          opacity: 0,
+          x: -50,
+        },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 2,
+          stagger: 0.5,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: testimonialHeadingRef.current,
+            start: "top 80%",
+            end: "top 30%",
+            scrub: 2,
+          },
+        }
+      );
+    }
+
+    if (faqRef.current) {
+      const words = faqRef.current.querySelectorAll(".word");
+
+      gsap.fromTo(
+        words,
+        {
+          opacity: 0,
+          x: -50,
+        },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 2,
+          stagger: 0.5,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: faqRef.current,
+            start: "top 80%",
+            end: "top 30%",
+            scrub: 2,
+          },
+        }
+      );
+    }
+
+    if (howItWorksRef.current) {
+      const words = howItWorksRef.current.querySelectorAll(".word");
+
+      gsap.fromTo(
+        words,
+        {
+          opacity: 0,
+          x: -50,
+        },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 2,
+          stagger: 0.5,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: howItWorksRef.current,
+            start: "top 80%",
+            end: "top 30%",
+            scrub: 2,
+          },
+        }
+      );
+    }
+  }, []);
+
   return (
     <>
       <div className="grid-background"></div>
@@ -33,27 +153,55 @@ export default function LandingPage() {
       {/* Features Section */}
       <section className="w-full py-12 sm:py-16 md:py-20 lg:py-28 xl:py-36 bg-background">
         <div className="mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tighter text-center mb-8 sm:mb-12 md:mb-16">
-            Powerful Features for Your Career Growth
-          </h2>
+          {/* Heading - Full Screen */}
+          <div className="min-w-full h-full flex items-center justify-center snap-center px-4 sm:px-6 md:px-8 flex-shrink-0">
+            <h2
+              ref={headingRef}
+              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tighter text-center mb-8 sm:mb-12 md:mb-16"
+            >
+              <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                Powerful
+              </span>
+              <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                Features
+              </span>
+              <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                for
+              </span>
+              <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                Your
+              </span>
+              <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                Career
+              </span>
+              <span className="word inline-block">Growth</span>
+            </h2>
+          </div>
+
+          {/* Feature Cards - Side by Side Horizontally */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8 max-w-none xl:max-w-[1400px] 2xl:max-w-[1600px] mx-auto">
             {features.map((feature, index) => (
-              <Card
+              <div
                 key={index}
-                className="border-2 hover:border-primary transition-colors duration-300 p-2 min-h-[240px] sm:min-h-[260px] md:min-h-[280px]"
+                className="transition-colors duration-300 h-full"
               >
-                <CardContent className="pt-6 sm:pt-8 pb-6 sm:pb-8 text-center flex flex-col items-center h-full">
-                  <div className="flex flex-col items-center justify-center h-full space-y-3 sm:space-y-4">
-                    <div className="text-3xl sm:text-4xl mb-2">
+                <SpotlightCard className="h-full min-h-[350px] sm:min-h-[380px] md:min-h-[420px] lg:min-h-[450px] p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col items-start justify-center h-full space-y-3 sm:space-y-4 md:space-y-6">
+                    <div
+                      className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl flex-shrink-0"
+                      style={{ color: "#B74BD2" }}
+                    >
                       {feature.icon}
                     </div>
-                    <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-3">{feature.title}</h3>
-                    <p className="text-muted-foreground text-sm sm:text-base md:text-lg leading-relaxed">
+                    <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-left">
+                      {feature.title}
+                    </h3>
+                    <p className="text-muted-foreground text-xs sm:text-sm md:text-base leading-relaxed text-left">
                       {feature.description}
                     </p>
                   </div>
-                </CardContent>
-              </Card>
+                </SpotlightCard>
+              </div>
             ))}
           </div>
         </div>
@@ -64,65 +212,186 @@ export default function LandingPage() {
         <div className="mx-auto px-4 sm:px-6 md:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 md:gap-12 mx-auto text-center">
             <div className="flex flex-col items-center justify-center space-y-2 sm:space-y-3 md:space-y-4">
-              <h3 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-primary">50+</h3>
-              <p className="text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">Industries Covered</p>
+              <CountUp
+                from={0}
+                to={50}
+                separator=","
+                direction="up"
+                duration={2}
+                className="count-up-text text-5xl font-bold"
+              />
+              <p className="text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">
+                Industries Covered
+              </p>
             </div>
             <div className="flex flex-col items-center justify-center space-y-2 sm:space-y-3 md:space-y-4">
-              <h3 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-primary">1000+</h3>
-              <p className="text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">Interview Questions</p>
+              <div className="flex items-baseline gap-1">
+                <CountUp
+                  from={0}
+                  to={1000}
+                  separator=","
+                  direction="up"
+                  duration={0.5}
+                  className="count-up-text text-5xl font-bold"
+                />
+                <span className="text-5xl font-bold">+</span>
+              </div>
+              <p className="text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">
+                Interview Questions
+              </p>
             </div>
             <div className="flex flex-col items-center justify-center space-y-2 sm:space-y-3 md:space-y-4">
-              <h3 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-primary">95%</h3>
-              <p className="text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">Success Rate</p>
+              <div className="flex items-baseline gap-1">
+                <CountUp
+                  from={0}
+                  to={95}
+                  separator=","
+                  direction="up"
+                  duration={1.5}
+                  className="count-up-text text-5xl font-bold"
+                />
+                <span className="text-5xl font-bold">%</span>
+              </div>
+              <p className="text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">
+                Success Rate
+              </p>
             </div>
             <div className="flex flex-col items-center justify-center space-y-2 sm:space-y-3 md:space-y-4">
-              <h3 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-primary">24/7</h3>
-              <p className="text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">AI Support</p>
+              <div className="flex items-baseline gap-1">
+                <CountUp
+                  from={0}
+                  to={24}
+                  separator=","
+                  direction="up"
+                  duration={1.5}
+                  className="count-up-text text-5xl font-bold"
+                />
+                <span className="text-5xl font-bold">/</span>
+                <CountUp
+                  from={0}
+                  to={7}
+                  separator=","
+                  direction="up"
+                  duration={1}
+                  className="count-up-text text-5xl font-bold"
+                />
+              </div>
+              <p className="text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">
+                AI Support
+              </p>
             </div>
           </div>
         </div>
       </section>
 
       {/* How It Works Section */}
-      <section className="w-full py-8 sm:py-12 md:py-16 lg:py-24 bg-background">
+      <section className="w-full py-8 sm:py-8 md:py-12 lg:py-16 bg-background">
         <div className="mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
-          <div className="text-center max-w-4xl mx-auto mb-8 sm:mb-10 md:mb-12">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">How It Works</h2>
-            <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
-              Eight comprehensive steps to transform your career with AI-powered guidance
-            </p>
+          <div className="text-center max-w-6xl mx-auto mb-8 sm:mb-10 md:mb-12">
+            <h2
+              ref={howItWorksRef}
+              className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4"
+            >
+              <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                How
+              </span>
+              <span className="word inline-block mr-2 sm:mr-3 md:mr-4">It</span>
+              <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                Works
+              </span>
+            </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-none xl:max-w-[1400px] 2xl:max-w-[1600px] mx-auto">
-            {howItWorks.map((item, index) => (
-              <div
-                key={index}
-                className="flex flex-col items-center text-center space-y-3 sm:space-y-4 group"
-              >
-                <div className="relative">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300">
-                    {item.icon}
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+            {/* Left side - Tracing Beam with content */}
+            <TracingBeam className="px-3">
+              <div className="space-y-8 sm:space-y-12 md:space-y-16">
+                {howItWorks.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex flex-col space-y-4 sm:space-y-6 group"
+                  >
+                    <div className="flex items-start gap-4 sm:gap-6">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-300">
+                          {item.icon}
+                        </div>
+                      </div>
+                      <div className="flex-1 pt-2">
+                        <h3 className="font-semibold text-xl sm:text-xl md:text-2xl mb-2 sm:mb-3">
+                          {item.title}
+                        </h3>
+                        <p className="text-muted-foreground text-base sm:text-base md:text-lg leading-relaxed">
+                          {item.description}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
-                    {index + 1}
-                  </div>
-                </div>
-                <h3 className="font-semibold text-lg sm:text-xl">{item.title}</h3>
-                <p className="text-muted-foreground text-sm sm:text-base">{item.description}</p>
+                ))}
               </div>
-            ))}
+
+              {/* Star Border Component */}
+              <div className="mt-12 flex justify-center">
+                <Link href="/dashboard" className="w-full max-w-md">
+                  <StarBorder
+                    as="button"
+                    color="#B74BD2"
+                    speed="4s"
+                    thickness={4}
+                    className="w-full cursor-pointer hover:scale-105 transition-transform duration-300"
+                  >
+                    <p className="text-sm sm:text-base md:text-lg font-semibold">
+                      Join Us Now
+                    </p>
+                  </StarBorder>
+                </Link>
+              </div>
+            </TracingBeam>
+
+            {/* Right side - 3D Spline Model */}
+            <div className="hidden lg:block lg:sticky lg:top-24 h-[400px] sm:h-[500px] lg:h-[600px] w-full rounded-lg overflow-hidden bg-muted/30">
+              <Suspense
+                fallback={
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center space-y-4">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                      <p className="text-muted-foreground">
+                        Loading 3D model...
+                      </p>
+                    </div>
+                  </div>
+                }
+              >
+                <Spline
+                  scene="https://prod.spline.design/Sl5BVKi6MUgfA6xZ/scene.splinecode"
+                  onError={(error) => console.log("Spline Error:", error)}
+                />
+              </Suspense>
+            </div>
           </div>
         </div>
       </section>
 
+      {/* Testimonial Section */}
       <section className="w-full py-12 sm:py-16 md:py-20 lg:py-28 bg-muted/50">
         <div className="mx-auto px-4 sm:px-6 md:px-8">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-8 sm:mb-12 md:mb-16">
-            What Our Users Say
+          <h2
+            ref={testimonialHeadingRef}
+            className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-8 sm:mb-12 md:mb-16"
+          >
+            <span className="word inline-block mr-2 sm:mr-3 md:mr-4">What</span>
+            <span className="word inline-block mr-2 sm:mr-3 md:mr-4">our</span>
+            <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+              users
+            </span>
+            <span className="word inline-block mr-2 sm:mr-3 md:mr-4">say</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8 md:gap-10 mx-auto">
             {testimonial.map((testimonial, index) => (
-              <Card key={index} className="bg-background p-2 min-h-[280px] sm:min-h-[300px] md:min-h-[320px]">
+              <Card
+                key={index}
+                className="bg-background p-2 min-h-[280px] sm:min-h-[300px] md:min-h-[320px]"
+              >
                 <CardContent className="pt-6 sm:pt-8 pb-6 sm:pb-8">
                   <div className="flex flex-col space-y-4 sm:space-y-6 h-full">
                     <div className="flex items-center space-x-4 sm:space-x-6 mb-3 sm:mb-4">
@@ -136,7 +405,9 @@ export default function LandingPage() {
                         />
                       </div>
                       <div>
-                        <p className="font-semibold text-base sm:text-lg">{testimonial.author}</p>
+                        <p className="font-semibold text-base sm:text-lg">
+                          {testimonial.author}
+                        </p>
                         <p className="text-sm sm:text-base text-muted-foreground">
                           {testimonial.role}
                         </p>
@@ -168,12 +439,29 @@ export default function LandingPage() {
       <section className="w-full py-8 sm:py-12 md:py-16 lg:py-24">
         <div className="mx-auto px-4 sm:px-6 md:px-8">
           <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10 md:mb-12">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
-              Find answers to common questions about our platform
-            </p>
+            <div ref={faqRef}>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">
+                <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                  Frequently
+                </span>
+                <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                  Asked
+                </span>
+                <span className="word inline-block mr-2 sm:mr-3 md:mr-4">
+                  Questions
+                </span>
+              </h2>
+              <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
+                <span className="word inline-block mr-1">Find</span>
+                <span className="word inline-block mr-1">answers</span>
+                <span className="word inline-block mr-1">to</span>
+                <span className="word inline-block mr-1">common</span>
+                <span className="word inline-block mr-1">questions</span>
+                <span className="word inline-block mr-1">about</span>
+                <span className="word inline-block mr-1">our</span>
+                <span className="word inline-block mr-1">platform</span>
+              </p>
+            </div>
           </div>
 
           <div className="max-w-3xl mx-auto">
@@ -183,7 +471,9 @@ export default function LandingPage() {
                   <AccordionTrigger className="text-left text-sm sm:text-base md:text-lg">
                     {faq.question}
                   </AccordionTrigger>
-                  <AccordionContent className="text-sm sm:text-base">{faq.answer}</AccordionContent>
+                  <AccordionContent className="text-sm sm:text-base">
+                    {faq.answer}
+                  </AccordionContent>
                 </AccordionItem>
               ))}
             </Accordion>
@@ -195,11 +485,21 @@ export default function LandingPage() {
       <section className="w-full py-12 sm:py-16 md:py-20 lg:py-28 bg-muted/50">
         <div className="mx-auto px-4 sm:px-6 md:px-8">
           <div className="flex flex-col items-center justify-center space-y-4 sm:space-y-6 text-center max-w-3xl mx-auto">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tighter text-foreground">
-              Ready to Accelerate Your Career?
-            </h2>
+            <SplitText
+              text="Ready to Accelerate Your Career ?"
+              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-center"
+              delay={70}
+              duration={1}
+              ease="elastic.out(1, 0.3)"
+              splitType="chars"
+              from={{ opacity: 0, y: 40 }}
+              to={{ opacity: 1, y: 0 }}
+              threshold={0.1}
+              rootMargin="-100px"
+              textAlign="center"
+            />
             <p className="mx-auto max-w-[600px] text-muted-foreground text-sm sm:text-base md:text-lg lg:text-xl">
-              Join thousands of professionals who are advancing their careers
+              Join thousands of students who are advancing their careers
               with AI-powered guidance.
             </p>
             <Link href="/dashboard" passHref>

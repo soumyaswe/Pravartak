@@ -17,7 +17,7 @@ export const faqs = [
   {
     question: "Is my data secure with Pravartak?",
     answer:
-      "Absolutely. We prioritize the security of your professional information. All data is encrypted and securely stored using industry-standard practices. We use Clerk for authentication and never share your personal information with third parties.",
+      "Absolutely. We prioritize the security of your professional information. All data is encrypted and securely stored using industry-standard practices. We use Firebase for authentication and never share your personal information with third parties.",
   },
   {
     question: "How can I track my interview preparation progress?",
