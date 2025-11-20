@@ -17,11 +17,35 @@ export async function POST(request) {
       );
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.trim() === '') {
       console.error('API: GEMINI_API_KEY is not configured');
       return NextResponse.json(
-        { error: 'AI service is not configured. Please set GEMINI_API_KEY in your environment variables.' },
+        { 
+          error: 'AI service is not configured. Please set GEMINI_API_KEY in your .env file.',
+          hint: 'Get your API key from https://aistudio.google.com/app/apikey'
+        },
         { status: 500 }
+      );
+    }
+    
+    // Optional: load list of known-leaked keys from an environment variable (avoid hardcoding keys in repo)
+    // Set `LEAKED_KEYS_JSON` to a JSON array of leaked keys at deploy time if you need this check.
+    const leakedKeys = (() => {
+      try {
+        return JSON.parse(process.env.LEAKED_KEYS_JSON || '[]');
+      } catch (e) {
+        return [];
+      }
+    })();
+
+    if (leakedKeys.length > 0 && leakedKeys.includes(process.env.GEMINI_API_KEY)) {
+      console.error('API: Using a leaked API key');
+      return NextResponse.json(
+        {
+          error: '🚨 Your API key has been reported as leaked and blocked by Google. Please generate a new key.',
+          hint: 'Provide a list of leaked keys via the LEAKED_KEYS_JSON environment variable.'
+        },
+        { status: 403 }
       );
     }
 
@@ -160,10 +184,13 @@ export async function POST(request) {
     });
     
     // More specific error messages
-    if (error.message?.includes('API key')) {
+    if (error.message?.includes('API key') || error.message?.includes('403') || error.message?.includes('leaked')) {
       return NextResponse.json(
-        { error: 'Invalid or missing API key. Please check your Gemini API key configuration.' },
-        { status: 500 }
+        { 
+          error: '🚨 Your API key has been reported as leaked. Please generate a new Gemini API key.',
+          hint: 'Get a new key from https://aistudio.google.com/app/apikey and update your .env file. See SECURITY_INCIDENT.md for details.'
+        },
+        { status: 403 }
       );
     } else if (error.message?.includes('quota')) {
       return NextResponse.json(

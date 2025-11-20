@@ -30,17 +30,19 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (do NOT commit these)
 .env*
 !.env.example
-!.env.production
 
 # Google Cloud credentials (NEVER commit these!)
 *credentials*.json
-flash-precept-471409-u3-0a2cc0ca3940.json
+*-credentials.json
+pravartak-*.json
+flash-precept-*.json
 gcp-credentials.json
 
 # Backend environment and credentials
+# deprecated: backend/.env removed in favor of single root .env
 backend/.env
 backend/gcp-credentials.json
 backend/audio_files/
@@ -73,7 +75,6 @@ next-env.d.ts
 # Firebase hosting files (using App Engine instead)
 firebase.json
 .firebaserc
-apphosting.yaml
 
 # Firebase Data Connect (unused)
 dataconnect/
@@ -86,6 +87,10 @@ src/dataconnect-generated/
 backups/
 *.backup
 *.backup_*
+
+# Local secrets directory (keep local, do not commit)
+.secrets/
+secrets/
 
 # Documentation (temporary guides)
 docs/

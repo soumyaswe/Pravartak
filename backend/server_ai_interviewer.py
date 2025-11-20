@@ -6,8 +6,6 @@ Integrates GCP Text-to-Speech, Speech-to-Text, and Google Gemini API
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
-from google.cloud import texttospeech, speech
-import google.generativeai as genai
 import os
 import json
 import uuid
@@ -15,10 +13,40 @@ from datetime import datetime
 import io
 import base64
 import threading
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the project root .env so the whole project uses a single env file.
+# find_dotenv() will search parent directories for a .env file when this script is run from backend/.
+env_path = find_dotenv(filename='.env')
+if env_path:
+    load_dotenv(env_path)
+    print(f'✅ Loaded .env from: {env_path}')
+else:
+    # Fallback to default behavior (will load .env in current working dir if present)
+    load_dotenv()
+
+# Set GOOGLE_APPLICATION_CREDENTIALS from .env if present (must be done before importing google.cloud)
+if 'GOOGLE_APPLICATION_CREDENTIALS' in os.environ:
+    creds_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+    # Resolve relative paths from repo root
+    if not os.path.isabs(creds_path):
+        # If running from backend/, go up one level to repo root
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        creds_path = os.path.join(repo_root, creds_path)
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = creds_path
+    
+    if os.path.exists(creds_path):
+        print(f'✅ Using service account credentials: {creds_path}')
+    else:
+        print(f'⚠️ WARNING: GOOGLE_APPLICATION_CREDENTIALS points to non-existent file: {creds_path}')
+        print('   Speech/TTS clients may fail to initialize.')
+else:
+    print('⚠️ WARNING: GOOGLE_APPLICATION_CREDENTIALS not set in environment variables')
+    print('   Set it in .env or use Application Default Credentials (gcloud auth application-default login)')
+
+# Now import Google Cloud clients (they will use the credentials we just set)
+from google.cloud import texttospeech, speech
+import google.generativeai as genai
 
 app = Flask(__name__)
 
@@ -332,7 +360,10 @@ def generate_speech_and_animation(text):
         return blend_data, f'/audio/{filename}'
     
     except Exception as e:
-        print(f'Error generating speech: {str(e)}')
+        print(f'❌ Error generating speech: {str(e)}')
+        print(f'❌ Error type: {type(e).__name__}')
+        import traceback
+        traceback.print_exc()
         raise
 
 
@@ -543,10 +574,18 @@ Keep your greeting natural, warm and professional. Keep it to 2-3 sentences maxi
         print(f'🗣️ AI says: {ai_greeting}')
     
     except Exception as e:
-        print(f'❌ Error starting interview: {str(e)}')
+        error_msg = str(e)
+        print(f'❌ Error starting interview: {error_msg}')
+        print(f'❌ Error type: {type(e).__name__}')
         import traceback
         traceback.print_exc()
-        emit('error', {'message': str(e)})
+        
+        # Send detailed error to client
+        emit('error', {
+            'message': error_msg,
+            'type': type(e).__name__,
+            'details': 'Check backend logs for full traceback'
+        })
 
 
 @socketio.on('audio_stream_start')

@@ -71,7 +71,9 @@ export default function MockInterviewPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to generate questions");
+        const errorMessage = data.error || "Failed to generate questions";
+        const hint = data.hint ? `\n\n💡 ${data.hint}` : '';
+        throw new Error(errorMessage + hint);
       }
 
       setQuestions(data.questions);
@@ -83,8 +85,22 @@ export default function MockInterviewPage() {
 
       return true;
     } catch (error) {
-      console.error("Error generating questions:", error);
-      setError(error.message);
+      const errorMsg = error.message || "Failed to generate questions";
+      setError(errorMsg);
+      
+      // Show toast for better visibility
+      if (errorMsg.includes('leaked') || errorMsg.includes('403')) {
+        toast.error('API Key Blocked', {
+          description: 'Your Gemini API key has been blocked. Please check GET_NEW_API_KEY.md for instructions.',
+          duration: 8000,
+        });
+      } else {
+        toast.error('Failed to Generate Questions', {
+          description: errorMsg,
+          duration: 5000,
+        });
+      }
+      
       return false;
     } finally {
       setIsGeneratingQuestions(false);
@@ -298,9 +314,20 @@ export default function MockInterviewPage() {
         </div>
 
         {error && (
-          <Alert className="mb-6">
-            <AlertDescription className="text-red-600">
-              {error}
+          <Alert className="mb-6 border-red-500 bg-red-50 dark:bg-red-950">
+            <AlertDescription className="text-red-700 dark:text-red-300">
+              <div className="space-y-2">
+                <p className="font-semibold">{error}</p>
+                {(error.includes('leaked') || error.includes('403') || error.includes('API key')) && (
+                  <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      <strong>Quick Fix:</strong> Your API key has been blocked by Google. 
+                      <br />
+                      📖 See <code className="bg-yellow-100 dark:bg-yellow-900 px-1 py-0.5 rounded">GET_NEW_API_KEY.md</code> in the project root for step-by-step instructions.
+                    </p>
+                  </div>
+                )}
+              </div>
             </AlertDescription>
           </Alert>
         )}

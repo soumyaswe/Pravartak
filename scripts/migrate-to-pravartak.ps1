@@ -104,9 +104,25 @@ $backendEnvContent = $backendEnvContent -replace "YOUR_NEW_GEMINI_API_KEY_HERE",
 Set-Content ".\backend\.env" -Value $backendEnvContent
 Write-Host "✓ Updated backend .env file" -ForegroundColor Green
 
-# Copy credentials to backend
-Copy-Item $newCredsFile ".\backend\gcp-credentials.json"
-Write-Host "✓ Copied credentials to backend folder" -ForegroundColor Green
+# Credentials handling: DO NOT copy service account JSON into the repository
+Write-Host "\nIMPORTANT: Do NOT commit service-account JSON into the repository." -ForegroundColor Yellow
+$uploadChoice = Read-Host "Upload this key to Google Secret Manager now? (y/N)"
+if ($uploadChoice -eq 'y') {
+    $secretName = Read-Host "Enter Secret Manager secret name (example: pravartak-gcp-key)"
+    try {
+        # Try creating the secret; ignore error if it already exists
+        gcloud secrets create $secretName --data-file=$newCredsFile --project=$projectId 2>$null
+        Write-Host "✓ Created secret '$secretName' and uploaded the key" -ForegroundColor Green
+    } catch {
+        # If secret exists, add a new version instead
+        Write-Host "Secret may already exist. Adding a new secret version..." -ForegroundColor Yellow
+        gcloud secrets versions add $secretName --data-file=$newCredsFile --project=$projectId
+        Write-Host "✓ Added new secret version for '$secretName'" -ForegroundColor Green
+    }
+    Write-Host "Note: Update your deployment to read the service account from Secret Manager instead of a file." -ForegroundColor Cyan
+} else {
+    Write-Host "Skipping upload. If you need to test locally, copy the JSON to a local path that is gitignored (DO NOT commit it)." -ForegroundColor Yellow
+}
 
 Write-Host "`nStep 5: Verifying setup..." -ForegroundColor Yellow
 

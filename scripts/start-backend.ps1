@@ -50,14 +50,14 @@ if (-Not (Test-Path ".\gcp-credentials.json")) {
     }
 }
 
-# Check if .env exists
-if (-Not (Test-Path ".\.env")) {
-    Write-Host "⚠️  .env file not found!" -ForegroundColor Yellow
-    Write-Host "Copying from .env.example..." -ForegroundColor Yellow
-    Copy-Item ".\.env.example" ".\.env"
-    if (Test-Path ".\.env") {
-        Write-Host "✅ .env file created" -ForegroundColor Green
-        Write-Host "⚡ Please edit backend/.env to add your GCP_PROJECT_ID" -ForegroundColor Yellow
+# Check if root .env exists (we use a single root .env for the whole project)
+if (-Not (Test-Path "..\.env")) {
+    Write-Host "⚠️  Root .env file not found!" -ForegroundColor Yellow
+    Write-Host "Copying from root .env.example to create a root .env..." -ForegroundColor Yellow
+    Copy-Item "..\.env.example" "..\.env"
+    if (Test-Path "..\.env") {
+        Write-Host "✅ Root .env file created at project root" -ForegroundColor Green
+        Write-Host "⚡ Please edit .env in the repository root to add your GCP_PROJECT_ID and other settings" -ForegroundColor Yellow
     }
 }
 

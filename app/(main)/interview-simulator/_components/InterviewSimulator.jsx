@@ -6,6 +6,7 @@ import { useGLTF, useTexture, Loader, Environment, useFBX, useAnimations, Orthog
 import { LineBasicMaterial, Vector2, MeshStandardMaterial, MeshPhysicalMaterial } from 'three';
 import ReactAudioPlayer from 'react-audio-player';
 import { io } from 'socket.io-client';
+import { logError, getSafeErrorMessage } from '@/lib/error-handler';
 import createAnimation from './converter';
 import blinkData from './blendDataBlink.json';
 import * as THREE from 'three';
@@ -570,8 +571,55 @@ function AppInterviewer() {
     });
 
     socket.on('error', (data) => {
-      console.error('❌ Error:', data);
-      setStatusMessage(`Error: ${data.message}`);
+      // Defensive handling: server may send an empty object or string
+      console.error('❌ Socket error received');
+      console.error('Error data type:', typeof data);
+      console.error('Error data:', data);
+      console.error('Error keys:', data && typeof data === 'object' ? Object.keys(data) : 'N/A');
+      
+      let message = 'An unknown error occurred';
+
+      try {
+        if (!data) {
+          message = 'Unknown server error';
+        } else if (typeof data === 'string') {
+          message = data;
+        } else if (data.message) {
+          message = data.message;
+        } else if (data.error && data.error.message) {
+          message = data.error.message;
+        } else if (data.type || data.details) {
+          message = `${data.type || 'Error'}: ${data.details || 'No details provided'}`;
+        } else {
+          // Try a compact representation for debugging
+          message = JSON.stringify(data).slice(0, 200);
+        }
+      } catch (err) {
+        console.error('Error parsing:', err);
+        message = 'Error parsing server error payload';
+      }
+
+      console.error('Parsed message:', message);
+
+      // Log with centralized error handler (will be no-op in production until integrated)
+      try {
+        logError(new Error(message), { 
+          source: 'socket.error', 
+          payload: data, 
+          fullData: data,
+          dataType: typeof data,
+          dataKeys: data && typeof data === 'object' ? Object.keys(data) : []
+        });
+      } catch (e) {
+        // Fallback: only log in development
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Socket error logging failed', e);
+          console.error('Original error data:', data);
+        }
+      }
+
+      // Present safe message to user
+      setStatusMessage(`Error: ${message}`);
     });
 
     socket.on('stream_ready', (data) => {

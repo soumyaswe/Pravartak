@@ -26,8 +26,6 @@ export const AuthProvider = ({ children }) => {
       if (firebaseUser) {
         // Check/create user in database via API
         try {
-          console.log('Creating/checking user for:', firebaseUser.uid);
-          
           const response = await fetch('/api/user', {
             method: 'POST',
             headers: {
@@ -42,13 +40,10 @@ export const AuthProvider = ({ children }) => {
           }
 
           const { user } = await response.json();
-          console.log('User created/found:', user.id);
-          
           setUser(firebaseUser);
           
           // Get Firebase ID token and set it as a cookie for server actions
           const idToken = await firebaseUser.getIdToken();
-          console.log("Setting firebase-token cookie, token length:", idToken.length);
           
           // Set cookies with proper configuration
           // Remove Secure flag for development (http://localhost)
@@ -63,7 +58,6 @@ export const AuthProvider = ({ children }) => {
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL
           };
-          console.log("Setting firebase-user cookie for user:", userData.uid);
           document.cookie = `firebase-user=${encodeURIComponent(JSON.stringify(userData))}; ${cookieOptions}`;
           
           // Small delay to ensure cookies are persisted before any server calls
@@ -73,19 +67,14 @@ export const AuthProvider = ({ children }) => {
           const cookies = document.cookie;
           const hasCookies = cookies.includes('firebase-user') && cookies.includes('firebase-token');
           
-          if (process.env.NODE_ENV === 'development') {
-            console.log("Auth cookies set:", {
-              hasFirebaseUser: cookies.includes('firebase-user'),
-              hasFirebaseToken: cookies.includes('firebase-token')
-            });
-          }
-          
-          // If cookies are not set, try alternative storage
-          if (!hasCookies) {
+          // If cookies are not set, log warning in development only
+          if (!hasCookies && process.env.NODE_ENV === 'development') {
             console.warn("Cookies not persisting, this may cause authentication issues");
           }
         } catch (error) {
-          console.error('Error checking user:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error checking user:', error);
+          }
           setUser(firebaseUser); // Still set user even if database check fails
         }
       } else {
@@ -102,11 +91,12 @@ export const AuthProvider = ({ children }) => {
       try {
         const result = await getRedirectResult(auth);
         if (result && result.user) {
-          console.log('Redirect sign-in successful:', result.user.uid);
           // The onAuthStateChanged will handle the rest
         }
       } catch (error) {
-        console.error('Redirect result error:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Redirect result error:', error);
+        }
         setLoading(false);
       }
     };
@@ -130,11 +120,8 @@ export const AuthProvider = ({ children }) => {
       
       return result.user;
     } catch (error) {
-      console.error('Popup sign-in failed:', error);
-      
       // If popup was blocked, try redirect method
       if (error.code === 'auth/popup-blocked') {
-        console.log('Popup blocked, trying redirect method...');
         try {
           // Store current path for redirect after sign-in
           const redirectPath = sessionStorage.getItem('redirectAfterLogin') || '/dashboard';
@@ -143,7 +130,6 @@ export const AuthProvider = ({ children }) => {
           await signInWithRedirect(auth, googleProvider);
           // The redirect will handle the rest, so we don't return anything here
         } catch (redirectError) {
-          console.error('Redirect sign-in also failed:', redirectError);
           throw redirectError;
         }
       } else {
@@ -165,7 +151,6 @@ export const AuthProvider = ({ children }) => {
       
       return result.user;
     } catch (error) {
-      console.error('Error signing in with email:', error);
       throw error;
     }
   };
@@ -183,7 +168,6 @@ export const AuthProvider = ({ children }) => {
       
       return result.user;
     } catch (error) {
-      console.error('Error signing up with email:', error);
       throw error;
     }
   };
@@ -192,7 +176,6 @@ export const AuthProvider = ({ children }) => {
     try {
       await signOut(auth);
     } catch (error) {
-      console.error('Error signing out:', error);
       throw error;
     }
   };

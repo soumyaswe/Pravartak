@@ -46,7 +46,16 @@ python
 # Diagrams
 diagrams
 
+# Credentials (NEVER include in Docker images)
+*credentials*.json
+*-credentials.json
+pravartak-*.json
+flash-precept-*.json
+gcp-credentials.json
+*.pem
+
 # Misc files
 *.log
+*.backup
 .vercel
 .turbo

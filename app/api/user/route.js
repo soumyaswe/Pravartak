@@ -6,7 +6,6 @@ export async function POST(request) {
     // Check if request has a body
     const contentLength = request.headers.get('content-length');
     if (!contentLength || contentLength === '0') {
-      console.error('Empty request body received');
       return NextResponse.json(
         { error: 'Empty request body' },
         { status: 400 }
@@ -17,7 +16,6 @@ export async function POST(request) {
     try {
       requestData = await request.json();
     } catch (jsonError) {
-      console.error('Failed to parse JSON:', jsonError);
       return NextResponse.json(
         { error: 'Invalid JSON in request body' },
         { status: 400 }
@@ -27,14 +25,11 @@ export async function POST(request) {
     const { firebaseUser } = requestData;
     
     if (!firebaseUser || !firebaseUser.uid) {
-      console.error('Invalid user data received:', firebaseUser);
       return NextResponse.json(
         { error: 'Invalid user data' },
         { status: 400 }
       );
     }
-
-    console.log('Checking/creating user for UID:', firebaseUser.uid);
 
     // Check if user already exists
     const existingUser = await db.user.findUnique({
@@ -44,7 +39,6 @@ export async function POST(request) {
     });
 
     if (existingUser) {
-      console.log('User already exists:', existingUser.id);
       return NextResponse.json({ user: existingUser });
     }
 
@@ -53,14 +47,11 @@ export async function POST(request) {
     const name = firebaseUser.displayName || "User";
 
     if (!email) {
-      console.error('No email found for user:', firebaseUser.uid);
       return NextResponse.json(
         { error: 'No email found for user' },
         { status: 400 }
       );
     }
-
-    console.log('Creating new user with email:', email);
 
     try {
       // Use upsert to handle both firebaseUserId and update
@@ -81,13 +72,10 @@ export async function POST(request) {
         },
       });
 
-      console.log('User created/updated successfully:', newUser.id);
       return NextResponse.json({ user: newUser });
     } catch (upsertError) {
       // If upsert fails due to email constraint, try to find by email
       if (upsertError.code === 'P2002') {
-        console.log('Unique constraint error, checking by email...');
-        
         // Check if a user with this email exists but different firebaseUserId
         const userByEmail = await db.user.findUnique({
           where: { email: email }
@@ -103,18 +91,12 @@ export async function POST(request) {
               imageUrl: firebaseUser.photoURL || "",
             }
           });
-          console.log('Updated existing user with new firebaseUserId:', updatedUser.id);
           return NextResponse.json({ user: updatedUser });
         }
       }
       throw upsertError;
     }
   } catch (error) {
-    // Only log detailed errors in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error("Error in user API:", error.code, error.message);
-    }
-    
     // Final fallback: try to retrieve user by firebaseUserId
     if (error.code === 'P2002' && requestData?.firebaseUser?.uid) {
       try {
@@ -124,11 +106,10 @@ export async function POST(request) {
           },
         });
         if (existingUser) {
-          console.log('Found existing user in final fallback:', existingUser.id);
           return NextResponse.json({ user: existingUser });
         }
       } catch (retryError) {
-        console.error('Final fallback failed:', retryError.message);
+        // Silent fail on retry
       }
     }
     

@@ -20,7 +20,6 @@ export function useProfileProgress() {
       setProgress(data);
       return data;
     } catch (err) {
-      console.error('Failed to fetch profile progress:', err);
       setError(err.message);
       return null;
     } finally {

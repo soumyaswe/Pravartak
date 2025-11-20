@@ -6,6 +6,7 @@ import { useGLTF, useTexture, Loader, Environment, useFBX, useAnimations, Orthog
 import { LineBasicMaterial, Vector2, MeshStandardMaterial, MeshPhysicalMaterial } from 'three';
 import ReactAudioPlayer from 'react-audio-player';
 import { io } from 'socket.io-client';
+import { logError, getSafeErrorMessage } from '@/lib/error-handler';
 import createAnimation from './converter';
 import blinkData from './blendDataBlink.json';
 import * as THREE from 'three';
@@ -339,8 +340,30 @@ export default function InterviewSimulatorV2() {
     });
 
     socket.on('error', (data) => {
-      console.error('❌ Error:', data);
-      setStatusMessage(`Error: ${data.message}`);
+      let message = 'An unknown error occurred';
+      try {
+        if (!data) {
+          message = 'Unknown server error';
+        } else if (typeof data === 'string') {
+          message = data;
+        } else if (data.message) {
+          message = data.message;
+        } else if (data.error && data.error.message) {
+          message = data.error.message;
+        } else {
+          message = JSON.stringify(data).slice(0, 200);
+        }
+      } catch (err) {
+        message = 'Error parsing server error payload';
+      }
+
+      try {
+        logError(new Error(message), { source: 'socket.error', payload: data });
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') console.error('Socket error logging failed', e);
+      }
+
+      setStatusMessage(`Error: ${message}`);
     });
 
     return () => {
