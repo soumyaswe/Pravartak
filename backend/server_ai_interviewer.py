@@ -50,22 +50,31 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# Enable CORS for React frontend
+# Enable CORS for React frontend (including production URLs)
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:8000", 
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+    "https://pravartak-backend--pravartak-15665.web.app",
+    "https://pravartak-15665.web.app",
+]
+# Add NEXT_PUBLIC_BASE_URL if available
+if os.environ.get('NEXT_PUBLIC_BASE_URL'):
+    allowed_origins.append(os.environ.get('NEXT_PUBLIC_BASE_URL'))
+# Filter out empty strings
+allowed_origins = [origin for origin in allowed_origins if origin]
+
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:8000"],
+        "origins": allowed_origins,
         "methods": ["GET", "POST"],
         "allow_headers": ["Content-Type"]
     }
 })
 
 # Initialize SocketIO with CORS and extended timeouts for long audio processing
-socketio = SocketIO(app, cors_allowed_origins=[
-    "http://localhost:3000",
-    "http://localhost:8000", 
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8000"
-], async_mode='eventlet', 
+socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode='eventlet', 
    ping_timeout=600,  # Increase timeout to 600 seconds (10 minutes) for very long audio processing
    ping_interval=120,  # Send ping every 120 seconds to keep connection alive
    max_http_buffer_size=100 * 1024 * 1024  # 100MB buffer for very large audio data
@@ -890,10 +899,12 @@ def talk():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    # Cloud Run requires binding to 0.0.0.0, not 127.0.0.1
+    host = '0.0.0.0' if os.environ.get('PORT') else '127.0.0.1'
     
     print(f"""
     🚀 AI Interviewer Avatar Server Starting...
-    📍 Host: 127.0.0.1
+    📍 Host: {host}
     🔌 Port: {port}
     🤖 AI Model: Gemini 2.5 Flash (via API)
     🎤 Speech-to-Text: Enabled
@@ -903,7 +914,7 @@ if __name__ == '__main__':
     # Run with SocketIO
     socketio.run(
         app,
-        host='127.0.0.1',
+        host=host,
         port=port,
         debug=False,
         use_reloader=False

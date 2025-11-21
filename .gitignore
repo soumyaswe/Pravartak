@@ -97,6 +97,7 @@ docs/
 DATA_FLOW_GUIDE.md
 MISSING_FEATURES_GUIDE.md
 FIREBASE_ENV_SETUP.md
+DEPLOYMENT.md
 
 # Setup and documentation files (keep these)
 !INTERVIEW_SIMULATOR_SETUP.md
