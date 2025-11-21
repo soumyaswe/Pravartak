@@ -12,6 +12,9 @@ runConfig:
   # Concurrency
   concurrency: 80
 
+  # Allow unauthenticated access (public web app)
+  invoker: public
+
   env:
     # ========================================
     # DATABASE (CRITICAL - Required for Prisma)
