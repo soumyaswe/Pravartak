@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { auth } from "@/lib/firebase";
 
 // GET - List all resumes for a user
 export async function GET(request) {
