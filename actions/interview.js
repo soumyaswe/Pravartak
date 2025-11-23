@@ -114,6 +114,28 @@ export async function saveQuizResult(questions, answers, score) {
       },
     });
 
+    // Create activity record
+    try {
+      await db.userActivity.create({
+        data: {
+          userId: user.id,
+          activityType: "SKILL_ASSESSED",
+          description: `Completed practice quiz with score ${score.toFixed(1)}%`,
+          metadata: {
+            assessmentId: assessment.id,
+            score: score,
+            category: "Technical",
+          },
+        },
+      });
+    } catch (activityError) {
+      console.error("Error creating activity record:", activityError);
+      // Don't fail the assessment creation if activity logging fails
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/interview");
+
     return assessment;
   } catch (error) {
     console.error("Error saving quiz result:", error);

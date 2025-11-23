@@ -26,32 +26,9 @@ import {
   Wand2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-// Note: We are not importing 'useAuth' or 'useRouter' here
-// as they are not used in this self-contained component.
-// You would add them back when integrating with Next.js.
-// import { useAuth } from '@/contexts/auth-context';
-// import { useRouter } from 'next/navigation';
-
-// --- Server Actions ---
-// In a real Next.js app, this would be imported:
-// import { createResume, updateResume, improveWithAI } from '@/actions/resume';
-// For this standalone demo, we will mock them.
-const createResume = async (data) => {
-  console.log("Mock createResume:", data);
-  await new Promise(res => setTimeout(res, 1000));
-  return { id: "new-resume-123", ...data };
-};
-const updateResume = async (id, data) => {
-  console.log("Mock updateResume:", id, data);
-  await new Promise(res => setTimeout(res, 1000));
-  return { id, ...data };
-};
-const improveWithAI = async ({ current, type, jobTitle }) => {
-  console.log("Mock improveWithAI:", { current, type, jobTitle });
-  await new Promise(res => setTimeout(res, 1500));
-  return `This is an AI-improved ${type} for a ${jobTitle}: ${current.substring(0, 50)}...`;
-};
-
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
+import { createResume, updateResume, improveWithAI } from '@/actions/resume';
 
 // --- Zod Schema for Validation ---
 const contactsSchema = z.object({
@@ -1161,8 +1138,8 @@ export default function ResumeBuilder({ mode = "create", initialResume = null })
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isImprovingFields, setIsImprovingFields] = useState({});
-  // const { user } = useAuth(); // Add back when integrating
-  // const router = useRouter(); // Add back when integrating
+  const { user } = useAuth();
+  const router = useRouter();
   const previewRef = useRef();
 
   // FIX: Load blank data for "create" mode, or initialResume data for "edit" mode.
@@ -1307,21 +1284,26 @@ export default function ResumeBuilder({ mode = "create", initialResume = null })
 
   // Save resume to database
   const onSubmit = async (data) => {
+    if (!user) {
+      toast.error('Please sign in to save your resume');
+      return;
+    }
+
     setIsSaving(true);
     try {
       let result;
       
       if (mode === 'edit' && initialResume?.id) {
         result = await updateResume(initialResume.id, data);
+        toast.success('Resume updated successfully!');
       } else {
         result = await createResume(data);
+        toast.success('Resume saved successfully!');
       }
 
       if (result && result.id) {
-        toast.success(`Resume ${mode === 'edit' ? 'updated' : 'saved'} successfully!`);
-        // router.push('/resume'); // Add back when integrating
-      } else {
-        throw new Error('Failed to save resume');
+        // Redirect to my resumes page
+        router.push('/resume/my-resumes');
       }
     } catch (error) {
       console.error('Error saving resume:', error);

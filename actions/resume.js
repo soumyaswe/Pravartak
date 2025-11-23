@@ -27,6 +27,24 @@ export async function createResume(content) {
       },
     });
 
+    // Create activity record
+    try {
+      await db.userActivity.create({
+        data: {
+          userId: user.id,
+          activityType: "RESUME_CREATED",
+          description: `Created resume: ${resume.title}`,
+          metadata: {
+            resumeId: resume.id,
+            title: resume.title,
+          },
+        },
+      });
+    } catch (activityError) {
+      console.error("Error creating activity record:", activityError);
+      // Don't fail the resume creation if activity logging fails
+    }
+
     revalidatePath("/resume"); // Revalidates the builder page
     revalidatePath("/resume/my-resumes"); // Revalidates the list page
     revalidatePath("/dashboard");
@@ -64,6 +82,24 @@ export async function updateResume(resumeId, content) {
         updatedAt: new Date(),
       },
     });
+
+    // Create activity record
+    try {
+      await db.userActivity.create({
+        data: {
+          userId: user.id,
+          activityType: "RESUME_UPDATED",
+          description: `Updated resume: ${resume.title}`,
+          metadata: {
+            resumeId: resume.id,
+            title: resume.title,
+          },
+        },
+      });
+    } catch (activityError) {
+      console.error("Error creating activity record:", activityError);
+      // Don't fail the resume update if activity logging fails
+    }
 
     revalidatePath("/resume");
     revalidatePath("/resume/my-resumes");

@@ -74,6 +74,25 @@ export async function generateCoverLetter(data) {
       },
     });
 
+    // Create activity record
+    try {
+      await db.userActivity.create({
+        data: {
+          userId: user.id,
+          activityType: "COVER_LETTER_CREATED",
+          description: `Created cover letter for ${data.jobTitle} at ${data.companyName}`,
+          metadata: {
+            coverLetterId: coverLetter.id,
+            jobTitle: data.jobTitle,
+            companyName: data.companyName,
+          },
+        },
+      });
+    } catch (activityError) {
+      console.error("Error creating activity record:", activityError);
+      // Don't fail the cover letter creation if activity logging fails
+    }
+
     revalidatePath("/dashboard");
     
     // Recalculate profile progress
