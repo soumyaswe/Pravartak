@@ -48,9 +48,9 @@ export default function ResumeOptions({ existingResumes = [] }) {
       </div>
 
       {/* Action Cards */}
-      <div className="grid md:grid-cols-2 gap-8 mb-12">
+      <div className="flex justify-center mb-12">
         {/* Create New Resume */}
-        <Card className="bg-neutral-900 border-neutral-800 hover:border-blue-500 transition-all duration-300 cursor-pointer group">
+        <Card className="bg-neutral-900 border-neutral-800 hover:border-blue-500 transition-all duration-300 cursor-pointer group w-full max-w-md">
           <CardHeader className="text-center pb-4">
             <div className="mx-auto mb-4 p-4 bg-blue-600 rounded-full w-20 h-20 flex items-center justify-center group-hover:bg-blue-500 transition-colors">
               <Plus className="w-10 h-10 text-white" />
@@ -88,7 +88,7 @@ export default function ResumeOptions({ existingResumes = [] }) {
         </Card>
 
         {/* Improve Existing Resume */}
-        <Card className="bg-neutral-900 border-neutral-800 hover:border-green-500 transition-all duration-300 cursor-pointer group">
+        {/* <Card className="bg-neutral-900 border-neutral-800 hover:border-green-500 transition-all duration-300 cursor-pointer group">
           <CardHeader className="text-center pb-4">
             <div className="mx-auto mb-4 p-4 bg-green-600 rounded-full w-20 h-20 flex items-center justify-center group-hover:bg-green-500 transition-colors">
               <Edit3 className="w-10 h-10 text-white" />
@@ -168,7 +168,7 @@ export default function ResumeOptions({ existingResumes = [] }) {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Recent Activity */}

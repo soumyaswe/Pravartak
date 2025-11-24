@@ -501,20 +501,26 @@ function AppInterviewer() {
       setStatusMessage('Connected - Ready to start');
     });
 
+    socket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      setConnected(false);
+      setStatusMessage(`Connection failed: ${error.message}`);
+    });
+
     socket.on('disconnect', () => {
-      console.log('❌ Disconnected from server');
+      console.log('Disconnected from server');
       setConnected(false);
       setStatusMessage('Disconnected from server');
     });
 
     socket.on('connection_response', (data) => {
-      console.log('🔗 Connection response:', data);
+      console.log('Connection response:', data);
     });
 
     socket.on('avatar_speaks', (data) => {
-      console.log('🗣️ Avatar speaking - BlendData frames:', data.blendData?.length || 0);
-      console.log('🎵 Audio file:', data.filename);
-      console.log('💬 Transcript:', data.transcript);
+      console.log(' Avatar speaking - BlendData frames:', data.blendData?.length || 0);
+      console.log(' Audio file:', data.filename);
+      console.log(' Transcript:', data.transcript);
       
       setBlendData(data.blendData);
       setAudioSource(host + data.filename);
@@ -572,16 +578,17 @@ function AppInterviewer() {
 
     socket.on('error', (data) => {
       // Defensive handling: server may send an empty object or string
-      console.error('❌ Socket error received');
+      console.group('Socket Error Received');
       console.error('Error data type:', typeof data);
       console.error('Error data:', data);
       console.error('Error keys:', data && typeof data === 'object' ? Object.keys(data) : 'N/A');
+      console.error('Error stringified:', JSON.stringify(data, null, 2));
       
       let message = 'An unknown error occurred';
 
       try {
         if (!data) {
-          message = 'Unknown server error';
+          message = 'Unknown server error - No data received';
         } else if (typeof data === 'string') {
           message = data;
         } else if (data.message) {
@@ -592,7 +599,7 @@ function AppInterviewer() {
           message = `${data.type || 'Error'}: ${data.details || 'No details provided'}`;
         } else {
           // Try a compact representation for debugging
-          message = JSON.stringify(data).slice(0, 200);
+          message = `Server Error: ${JSON.stringify(data).slice(0, 200)}`;
         }
       } catch (err) {
         console.error('Error parsing:', err);
@@ -600,6 +607,7 @@ function AppInterviewer() {
       }
 
       console.error('Parsed message:', message);
+      console.groupEnd();
 
       // Log with centralized error handler (will be no-op in production until integrated)
       try {
@@ -713,6 +721,7 @@ function AppInterviewer() {
     try {
       audioChunksRef.current = [];
       let totalSamplesSent = 0;  // Track total samples sent
+      let pendingProcessing = 0;  // Track pending audio processing tasks
 
       // Emit stream start
       console.log('📤 Emitting audio_stream_start...');
@@ -746,8 +755,9 @@ function AppInterviewer() {
       mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          pendingProcessing++;  // Increment counter
           
-          console.log(`📥 Received audio chunk: ${event.data.size} bytes, total chunks: ${audioChunksRef.current.length}`);
+          console.log(`Received audio chunk: ${event.data.size} bytes, total chunks: ${audioChunksRef.current.length}`);
           
           // Convert chunk to PCM and send to backend immediately
           try {
@@ -759,7 +769,7 @@ function AppInterviewer() {
               return;
             }
             
-            console.log(`🔄 Processing chunk ${audioChunksRef.current.length}: ${arrayBuffer.byteLength} bytes`);
+            console.log(`Processing chunk ${audioChunksRef.current.length}: ${arrayBuffer.byteLength} bytes`);
             
             // Create audio context with native sample rate to preserve quality
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -769,14 +779,14 @@ function AppInterviewer() {
             try {
               audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
             } catch (decodeError) {
-              console.warn('⚠️ Direct decode failed:', decodeError.message);
+              console.warn('Direct decode failed:', decodeError.message);
               // Skip this chunk if decode fails
               audioContext.close();
               return;
             }
             
             if (!audioBuffer || audioBuffer.length === 0) {
-              console.warn('⚠️ Audio buffer is empty after decode');
+              console.warn('Audio buffer is empty after decode');
               audioContext.close();
               return;
             }
@@ -803,51 +813,63 @@ function AppInterviewer() {
               pcmInt16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
             }
             
-            console.log(`📊 Chunk ${audioChunksRef.current.length}: ${pcmInt16.length} samples at 16kHz (from ${pcmData.length} at ${sourceSampleRate}Hz)`);
+            console.log(`Chunk ${audioChunksRef.current.length}: ${pcmInt16.length} samples at 16kHz (from ${pcmData.length} at ${sourceSampleRate}Hz)`);
             
             totalSamplesSent += pcmInt16.length;
             
             // Send PCM data to backend
             if (socket && socket.connected) {
               socket.emit('audio_stream_data', { audio: Array.from(pcmInt16) });
-              console.log(`📤 Sent chunk ${audioChunksRef.current.length}: ${pcmInt16.length} samples to backend (total: ${totalSamplesSent}, ${(totalSamplesSent/16000).toFixed(2)}s)`);
+              console.log(`Sent chunk ${audioChunksRef.current.length}: ${pcmInt16.length} samples to backend (total: ${totalSamplesSent}, ${(totalSamplesSent/16000).toFixed(2)}s)`);
             } else {
-              console.error('❌ Socket not connected, cannot send audio data');
+              console.error('Socket not connected, cannot send audio data');
             }
             
             // Close audio context to free resources
             audioContext.close();
           } catch (err) {
-            console.error('❌ Error processing audio chunk:', err);
+            console.error('Error processing audio chunk:', err);
+          } finally {
+            pendingProcessing--;  // Decrement counter when done
           }
         } else {
-          console.warn('⚠️ Received chunk with 0 size');
+          console.warn('Received chunk with 0 size');
+          pendingProcessing--;  // Decrement even for empty chunks
         }
       };      mediaRecorder.onstop = () => {
         if (!socket) {
-          console.error('❌ Socket not available');
+          console.error('Socket not available');
           setStatusMessage('Connection lost');
           return;
         }
 
         const totalChunks = audioChunksRef.current.length;
         
-        console.log(`📦 Recording stopped - received ${totalChunks} audio chunks`);
+        console.log(`Recording stopped - received ${totalChunks} audio chunks`);
         
         if (totalChunks === 0) {
-          console.error('❌ No audio data recorded');
+          console.error('No audio data recorded');
           setStatusMessage('Error: No audio captured. Please check your microphone.');
           return;
         }
 
-        console.log('🔚 Sending audio_stream_end to backend...');
+        console.log('Waiting for audio processing to complete...');
         
-        // Give a small delay for the final ondataavailable to process
-        setTimeout(() => {
-          socket.emit('audio_stream_end');
-          setStatusMessage('🔄 Processing your response...');
-          console.log(`✅ Audio stream end signal sent - total samples sent: ${totalSamplesSent} (${(totalSamplesSent/16000).toFixed(2)}s)`);
-        }, 100);
+        // Wait for all pending audio processing to complete before sending end signal
+        const checkPendingAndSend = () => {
+          if (pendingProcessing === 0) {
+            console.log('All audio chunks processed, sending audio_stream_end...');
+            socket.emit('audio_stream_end');
+            setStatusMessage('Processing your response...');
+            console.log(`Audio stream end signal sent - total samples sent: ${totalSamplesSent} (${(totalSamplesSent/16000).toFixed(2)}s)`);
+          } else {
+            console.log(`Waiting for ${pendingProcessing} chunks to finish processing...`);
+            setTimeout(checkPendingAndSend, 50);  // Check again in 50ms
+          }
+        };
+        
+        // Start checking after a small delay to allow ondataavailable to fire
+        setTimeout(checkPendingAndSend, 100);
       };
 
       mediaRecorderRef.current = mediaRecorder;
@@ -856,12 +878,12 @@ function AppInterviewer() {
       mediaRecorder.start();
       setIsRecording(true);
       setUserTranscript(''); // Clear previous transcript
-      setStatusMessage('🎤 Recording... Speak clearly into your microphone');
+      setStatusMessage('Recording... Speak clearly into your microphone');
       
-      console.log('✅ Recording started successfully (will capture all audio until stopped)');
+      console.log('Recording started successfully (will capture all audio until stopped)');
 
     } catch (err) {
-      console.error('❌ Error starting recording:', err);
+      console.error('Error starting recording:', err);
       setStatusMessage('Error starting recording. Please check microphone permissions.');
     }
   };
@@ -869,7 +891,7 @@ function AppInterviewer() {
   // Stop recording
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      console.log('🛑 Stopping recording...');
+      console.log('Stopping recording...');
       
       // Request any remaining data before stopping
       if (mediaRecorderRef.current.state === 'recording') {
@@ -878,7 +900,7 @@ function AppInterviewer() {
       
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      setStatusMessage('🔄 Processing your answer... Please wait');
+      setStatusMessage('Processing your answer... Please wait');
     }
   };
 
