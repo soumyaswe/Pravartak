@@ -46,6 +46,7 @@ gcp-credentials.json
 backend/.env
 backend/gcp-credentials.json
 backend/audio_files/
+audio_files
 backend/__pycache__/
 
 # Python virtual environments

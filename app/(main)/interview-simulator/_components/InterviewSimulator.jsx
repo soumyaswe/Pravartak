@@ -501,6 +501,12 @@ function AppInterviewer() {
       setStatusMessage('Connected - Ready to start');
     });
 
+    socket.on('connect_error', (error) => {
+      console.error('❌ Connection error:', error);
+      setConnected(false);
+      setStatusMessage(`Connection failed: ${error.message}`);
+    });
+
     socket.on('disconnect', () => {
       console.log('❌ Disconnected from server');
       setConnected(false);
@@ -572,16 +578,17 @@ function AppInterviewer() {
 
     socket.on('error', (data) => {
       // Defensive handling: server may send an empty object or string
-      console.error('❌ Socket error received');
+      console.group('❌ Socket Error Received');
       console.error('Error data type:', typeof data);
       console.error('Error data:', data);
       console.error('Error keys:', data && typeof data === 'object' ? Object.keys(data) : 'N/A');
+      console.error('Error stringified:', JSON.stringify(data, null, 2));
       
       let message = 'An unknown error occurred';
 
       try {
         if (!data) {
-          message = 'Unknown server error';
+          message = 'Unknown server error - No data received';
         } else if (typeof data === 'string') {
           message = data;
         } else if (data.message) {
@@ -592,7 +599,7 @@ function AppInterviewer() {
           message = `${data.type || 'Error'}: ${data.details || 'No details provided'}`;
         } else {
           // Try a compact representation for debugging
-          message = JSON.stringify(data).slice(0, 200);
+          message = `Server Error: ${JSON.stringify(data).slice(0, 200)}`;
         }
       } catch (err) {
         console.error('Error parsing:', err);
@@ -600,6 +607,7 @@ function AppInterviewer() {
       }
 
       console.error('Parsed message:', message);
+      console.groupEnd();
 
       // Log with centralized error handler (will be no-op in production until integrated)
       try {
@@ -713,6 +721,7 @@ function AppInterviewer() {
     try {
       audioChunksRef.current = [];
       let totalSamplesSent = 0;  // Track total samples sent
+      let pendingProcessing = 0;  // Track pending audio processing tasks
 
       // Emit stream start
       console.log('📤 Emitting audio_stream_start...');
@@ -746,6 +755,7 @@ function AppInterviewer() {
       mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          pendingProcessing++;  // Increment counter
           
           console.log(`📥 Received audio chunk: ${event.data.size} bytes, total chunks: ${audioChunksRef.current.length}`);
           
@@ -819,9 +829,12 @@ function AppInterviewer() {
             audioContext.close();
           } catch (err) {
             console.error('❌ Error processing audio chunk:', err);
+          } finally {
+            pendingProcessing--;  // Decrement counter when done
           }
         } else {
           console.warn('⚠️ Received chunk with 0 size');
+          pendingProcessing--;  // Decrement even for empty chunks
         }
       };      mediaRecorder.onstop = () => {
         if (!socket) {
@@ -840,14 +853,23 @@ function AppInterviewer() {
           return;
         }
 
-        console.log('🔚 Sending audio_stream_end to backend...');
+        console.log('🔚 Waiting for audio processing to complete...');
         
-        // Give a small delay for the final ondataavailable to process
-        setTimeout(() => {
-          socket.emit('audio_stream_end');
-          setStatusMessage('🔄 Processing your response...');
-          console.log(`✅ Audio stream end signal sent - total samples sent: ${totalSamplesSent} (${(totalSamplesSent/16000).toFixed(2)}s)`);
-        }, 100);
+        // Wait for all pending audio processing to complete before sending end signal
+        const checkPendingAndSend = () => {
+          if (pendingProcessing === 0) {
+            console.log('✅ All audio chunks processed, sending audio_stream_end...');
+            socket.emit('audio_stream_end');
+            setStatusMessage('🔄 Processing your response...');
+            console.log(`✅ Audio stream end signal sent - total samples sent: ${totalSamplesSent} (${(totalSamplesSent/16000).toFixed(2)}s)`);
+          } else {
+            console.log(`⏳ Waiting for ${pendingProcessing} chunks to finish processing...`);
+            setTimeout(checkPendingAndSend, 50);  // Check again in 50ms
+          }
+        };
+        
+        // Start checking after a small delay to allow ondataavailable to fire
+        setTimeout(checkPendingAndSend, 100);
       };
 
       mediaRecorderRef.current = mediaRecorder;
