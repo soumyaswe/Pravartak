@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { SRGBColorSpace, LinearSRGBColorSpace } from 'three';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Video, Mic, MicOff, VideoOff, Phone, MessageSquare, X, Check, FileText } from 'lucide-react';
 
 const _ = require('lodash');
@@ -22,21 +22,6 @@ const host = 'http://127.0.0.1:5000'
 
 // Initialize Socket.IO connection
 let socket = null;
-
-const INTERVIEW_POSITIONS = [
-  'Software Engineer',
-  'Product Manager',
-  'Data Scientist',
-  'UX/UI Designer',
-  'DevOps Engineer',
-  'Marketing Manager',
-  'Sales Representative',
-  'Business Analyst',
-  'Project Manager',
-  'Frontend Developer',
-  'Backend Developer',
-  'Full Stack Developer',
-];
 
 function Avatar({ avatar_url, speak, setSpeak, text, setAudioSource, playing, blendData: externalBlendData }) {
 
@@ -691,8 +676,8 @@ function AppInterviewer() {
 
   // Start interview
   const handleStartInterview = () => {
-    if (!selectedPosition) {
-      alert('Please select an interview position');
+    if (!selectedPosition || selectedPosition.trim() === '') {
+      alert('Please enter an interview position');
       return;
     }
 
@@ -702,7 +687,7 @@ function AppInterviewer() {
     }
 
     console.log('🎬 Starting interview...');
-    socket.emit('start_interview', { position: selectedPosition });
+    socket.emit('start_interview', { position: selectedPosition.trim() });
     setInterviewStarted(true);
     setUiState('interview');
     setStatusMessage('Interview started - Waiting for AI...');
@@ -1013,21 +998,19 @@ function AppInterviewer() {
             </div>
           </div>
 
-          {/* Position Selector */}
+          {/* Position Input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Select Interview Position</label>
-            <Select value={selectedPosition} onValueChange={setSelectedPosition}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a position..." />
-              </SelectTrigger>
-              <SelectContent>
-                {INTERVIEW_POSITIONS.map((position) => (
-                  <SelectItem key={position} value={position}>
-                    {position}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-sm font-medium">Enter Interview Position</label>
+            <Input
+              type="text"
+              placeholder="e.g., Software Engineer, Product Manager, Data Scientist..."
+              value={selectedPosition}
+              onChange={(e) => setSelectedPosition(e.target.value)}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter the specific role you want to practice for
+            </p>
           </div>
 
           {/* Start Button */}

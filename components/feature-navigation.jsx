@@ -32,24 +32,29 @@ const navigationItems = [
     icon: FileText,
   },
   {
-    name: "Cover Letter AI",
+    name: "Cover Letter",
     href: "/ai-cover-letter",
     icon: MessageSquare,
-  },
-  {
-    name: "Interview Simulator",
-    href: "/interview-simulator",
-    icon: GraduationCap,
-  },
-  {
-    name: "Mock Interview",
-    href: "/mock-interview",
-    icon: Microscope,
   },
   {
     name: "CV Analyser",
     href: "/cv-analyser",
     icon: Briefcase,
+  },
+  {
+    name: "Practice Questions",
+    href: "/interview",
+    icon: GraduationCap,
+  },
+  {
+    name: "Mock Interviews",
+    href: "/mock-interview",
+    icon: Microscope,
+  },
+  {
+    name: "Interview Simulator",
+    href: "/interview-simulator",
+    icon: GraduationCap,
   },
   {
     name: "Industry Insights",
@@ -62,7 +67,7 @@ const navigationItems = [
     icon: BookOpen,
   },
   {
-    name: "Analytics",
+    name: "Progress Analytics",
     href: "/analytics",
     icon: TrendingUp,
   },
@@ -89,7 +94,7 @@ export default function FeatureNavigation({ showBackButton = true }) {
   return (
     <>
       {/* Fixed Navigation Bar with Hamburger and Back Button */}
-      <div className="fixed top-20 left-0 right-0 h-14 bg-background/95 backdrop-blur-sm border-b border-border/40 z-40 flex items-center px-4 gap-3">
+      <div className="fixed top-20 left-0 right-0 h-14 bg-background/60 backdrop-blur-xl border-b border-border/20 z-40 flex items-center px-4 gap-3 supports-[backdrop-filter]:bg-background/40">
         {/* Hamburger Menu Button */}
         <Button
           variant="ghost"
@@ -116,7 +121,16 @@ export default function FeatureNavigation({ showBackButton = true }) {
 
         {/* Current Page Title */}
         <div className="flex-1 text-sm font-medium text-muted-foreground truncate">
-          {navigationItems.find((item) => pathname.startsWith(item.href))?.name || ""}
+          {navigationItems.find((item) => {
+            const isMatch = pathname === item.href || 
+              (pathname.startsWith(item.href) && 
+               !navigationItems.some(navItem => 
+                 navItem.href !== item.href && 
+                 navItem.href.startsWith(item.href) && 
+                 pathname.startsWith(navItem.href)
+               ));
+            return isMatch;
+          })?.name || ""}
         </div>
       </div>
 
@@ -153,7 +167,13 @@ export default function FeatureNavigation({ showBackButton = true }) {
           <nav className="space-y-1">
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname.startsWith(item.href);
+              const isActive = pathname === item.href || 
+                (pathname.startsWith(item.href) && 
+                 !navigationItems.some(navItem => 
+                   navItem.href !== item.href && 
+                   navItem.href.startsWith(item.href) && 
+                   pathname.startsWith(navItem.href)
+                 ));
 
               return (
                 <Link
