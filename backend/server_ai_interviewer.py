@@ -20,7 +20,7 @@ from dotenv import load_dotenv, find_dotenv
 env_path = find_dotenv(filename='.env')
 if env_path:
     load_dotenv(env_path)
-    print(f'✅ Loaded .env from: {env_path}')
+    print(f' Loaded .env from: {env_path}')
 else:
     # Fallback to default behavior (will load .env in current working dir if present)
     load_dotenv()
@@ -36,12 +36,12 @@ if 'GOOGLE_APPLICATION_CREDENTIALS' in os.environ:
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = creds_path
     
     if os.path.exists(creds_path):
-        print(f'✅ Using service account credentials: {creds_path}')
+        print(f' Using service account credentials: {creds_path}')
     else:
-        print(f'⚠️ WARNING: GOOGLE_APPLICATION_CREDENTIALS points to non-existent file: {creds_path}')
+        print(f'️ WARNING: GOOGLE_APPLICATION_CREDENTIALS points to non-existent file: {creds_path}')
         print('   Speech/TTS clients may fail to initialize.')
 else:
-    print('⚠️ WARNING: GOOGLE_APPLICATION_CREDENTIALS not set in environment variables')
+    print('️ WARNING: GOOGLE_APPLICATION_CREDENTIALS not set in environment variables')
     print('   Set it in .env or use Application Default Credentials (gcloud auth application-default login)')
 
 # Now import Google Cloud clients (they will use the credentials we just set)
@@ -87,23 +87,23 @@ stt_client = speech.SpeechClient()
 # Initialize Gemini API (using API key instead of Vertex AI)
 gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
 if not gemini_api_key:
-    print('⚠️ WARNING: GEMINI_API_KEY not set in environment variables')
+    print('️ WARNING: GEMINI_API_KEY not set in environment variables')
     print('Please set GEMINI_API_KEY in your .env file')
 else:
     genai.configure(api_key=gemini_api_key)
-    print('✅ Gemini API configured successfully')
+    print(' Gemini API configured successfully')
 
 # Use Gemini 2.5 Flash
 try:
     gemini_model = genai.GenerativeModel('gemini-2.5-flash')
-    print('✅ Using Gemini 2.5 Flash')
+    print(' Using Gemini 2.5 Flash')
 except Exception as e:
-    print(f'⚠️ Gemini 2.5 Flash not available, trying 2.0 Flash: {e}')
+    print(f'️ Gemini 2.5 Flash not available, trying 2.0 Flash: {e}')
     try:
         gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        print('✅ Using Gemini 2.0 Flash Experimental')
+        print(' Using Gemini 2.0 Flash Experimental')
     except Exception as e2:
-        print(f'⚠️ Falling back to 1.5 Flash: {e2}')
+        print(f'️ Falling back to 1.5 Flash: {e2}')
         gemini_model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Directory to store generated audio files
@@ -310,7 +310,7 @@ def generate_blend_data_from_actual_duration(text, duration):
     for _ in range(30):
         blend_data.append({'blendshapes': neutral_values})
     
-    print(f'✅ Generated {len(blend_data)} frames for {duration:.2f}s audio ({len(blend_data)/fps:.2f}s animation)')
+    print(f' Generated {len(blend_data)} frames for {duration:.2f}s audio ({len(blend_data)/fps:.2f}s animation)')
     
     return blend_data
 
@@ -354,23 +354,23 @@ def generate_speech_and_animation(text):
             from mutagen.mp3 import MP3
             audio_file = MP3(filepath)
             actual_duration = audio_file.info.length
-            print(f'🎵 Audio duration: {actual_duration:.2f}s for text: "{text[:50]}..."')
+            print(f' Audio duration: {actual_duration:.2f}s for text: "{text[:50]}..."')
             
             # Generate blend data matching actual audio duration
             blend_data = generate_blend_data_from_actual_duration(text, actual_duration)
         except ImportError:
-            print('⚠️ mutagen not installed, using estimated duration')
+            print('️ mutagen not installed, using estimated duration')
             # Fallback to estimated duration
             blend_data = generate_blend_data_from_text(text, speaking_rate)
         except Exception as e:
-            print(f'⚠️ Could not get audio duration: {e}, using estimated')
+            print(f'️ Could not get audio duration: {e}, using estimated')
             blend_data = generate_blend_data_from_text(text, speaking_rate)
         
         return blend_data, f'/audio/{filename}'
     
     except Exception as e:
-        print(f'❌ Error generating speech: {str(e)}')
-        print(f'❌ Error type: {type(e).__name__}')
+        print(f' Error generating speech: {str(e)}')
+        print(f' Error type: {type(e).__name__}')
         import traceback
         traceback.print_exc()
         raise
@@ -379,12 +379,12 @@ def generate_speech_and_animation(text):
 def get_ai_response(session_id, user_text):
     """Get AI interviewer response using Gemini"""
     try:
-        print(f'🤖 Getting AI response for session: {session_id}')
-        print(f'📝 User text: "{user_text}"')
+        print(f' Getting AI response for session: {session_id}')
+        print(f' User text: "{user_text}"')
         
         # Check if chat session exists (it should have been created in start_interview)
         if session_id not in chat_sessions:
-            print(f'⚠️ No existing chat session for {session_id}, creating new one')
+            print(f'️ No existing chat session for {session_id}, creating new one')
             chat_sessions[session_id] = gemini_model.start_chat()
             conversation_histories[session_id] = []
             
@@ -405,7 +405,7 @@ Keep it to 2-3 sentences."""
                     'content': ai_response
                 })
                 
-                print(f'✅ Initial greeting: {ai_response}')
+                print(f' Initial greeting: {ai_response}')
                 return ai_response
         
         # Add user's response to history if not empty
@@ -425,7 +425,7 @@ Be encouraging and professional."""
             # If empty text, ask them to speak up
             prompt = "The candidate seems to have paused or you didn't hear them clearly. Politely ask them to repeat or elaborate on their answer. Keep it to 1-2 sentences."
         
-        print(f'📤 Sending prompt to Gemini...')
+        print(f' Sending prompt to Gemini...')
         response = chat_sessions[session_id].send_message(prompt)
         ai_response = response.text
         
@@ -435,12 +435,12 @@ Be encouraging and professional."""
             'content': ai_response
         })
         
-        print(f'✅ AI response: {ai_response}')
+        print(f' AI response: {ai_response}')
         return ai_response
     
     except Exception as e:
         error_msg = f'Error getting AI response: {str(e)}'
-        print(f'❌ {error_msg}')
+        print(f' {error_msg}')
         import traceback
         traceback.print_exc()
         return "I'm having trouble processing that. Could you please repeat your answer?"
@@ -449,18 +449,18 @@ Be encouraging and professional."""
 def get_ai_response_streaming(session_id, user_text):
     """Get AI interviewer response using Gemini with streaming"""
     try:
-        print(f'🤖 Getting AI response for session: {session_id}')
-        print(f'📝 User text: {user_text}')
+        print(f' Getting AI response for session: {session_id}')
+        print(f' User text: {user_text}')
         
         # Initialize chat session if it doesn't exist
         if session_id not in chat_sessions:
-            print(f'🆕 Creating new chat session for: {session_id}')
+            print(f' Creating new chat session for: {session_id}')
             chat_sessions[session_id] = gemini_model.start_chat()
             conversation_histories[session_id] = []
             
             # Get initial greeting with streaming
             initial_prompt = "Start the interview with a warm, professional greeting and your first question about the candidate's background. Keep it to 2-3 sentences."
-            print(f'📤 Sending initial prompt to Gemini...')
+            print(f' Sending initial prompt to Gemini...')
             response_stream = chat_sessions[session_id].send_message(
                 initial_prompt,
                 stream=True
@@ -476,7 +476,7 @@ def get_ai_response_streaming(session_id, user_text):
                 'role': 'interviewer',
                 'content': full_response
             })
-            print(f'✅ Initial response complete: {full_response}')
+            print(f' Initial response complete: {full_response}')
             return
         
         # Add user's response to history
@@ -490,7 +490,7 @@ def get_ai_response_streaming(session_id, user_text):
 
 Based on their response, ask a relevant follow-up question or move to the next topic. Keep your response to 1-3 sentences. Be natural and conversational."""
         
-        print(f'📤 Sending follow-up prompt to Gemini...')
+        print(f' Sending follow-up prompt to Gemini...')
         response_stream = chat_sessions[session_id].send_message(
             prompt,
             stream=True
@@ -507,11 +507,11 @@ Based on their response, ask a relevant follow-up question or move to the next t
             'role': 'interviewer',
             'content': full_response
         })
-        print(f'✅ Follow-up response complete: {full_response}')
+        print(f' Follow-up response complete: {full_response}')
     
     except Exception as e:
         error_msg = f'Error getting AI response: {str(e)}'
-        print(f'❌ {error_msg}')
+        print(f' {error_msg}')
         import traceback
         traceback.print_exc()
         yield "I'm having trouble processing that. Could you please repeat?"
@@ -522,14 +522,14 @@ Based on their response, ask a relevant follow-up question or move to the next t
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection"""
-    print(f'✅ Client connected: {request.sid}')
+    print(f' Client connected: {request.sid}')
     emit('connection_response', {'status': 'connected', 'session_id': request.sid})
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle client disconnection"""
-    print(f'❌ Client disconnected: {request.sid}')
+    print(f' Client disconnected: {request.sid}')
     # Clean up chat session
     if request.sid in chat_sessions:
         del chat_sessions[request.sid]
@@ -543,7 +543,7 @@ def handle_start_interview(data):
     try:
         session_id = request.sid
         position = data.get('position', 'Software Engineer') if data else 'Software Engineer'
-        print(f'🎤 Starting interview for session: {session_id}, position: {position}')
+        print(f' Starting interview for session: {session_id}, position: {position}')
         
         # Initialize the chat session with system instruction
         if session_id not in chat_sessions:
@@ -559,7 +559,7 @@ def handle_start_interview(data):
 
 Keep your greeting natural, warm and professional. Keep it to 2-3 sentences maximum."""
             
-            print(f'📤 Getting initial greeting for {position} position...')
+            print(f' Getting initial greeting for {position} position...')
             response = chat_sessions[session_id].send_message(initial_prompt)
             ai_greeting = response.text
             
@@ -580,12 +580,12 @@ Keep your greeting natural, warm and professional. Keep it to 2-3 sentences maxi
             'transcript': ai_greeting
         })
         
-        print(f'🗣️ AI says: {ai_greeting}')
+        print(f'️ AI says: {ai_greeting}')
     
     except Exception as e:
         error_msg = str(e)
-        print(f'❌ Error starting interview: {error_msg}')
-        print(f'❌ Error type: {type(e).__name__}')
+        print(f' Error starting interview: {error_msg}')
+        print(f' Error type: {type(e).__name__}')
         import traceback
         traceback.print_exc()
         
@@ -601,7 +601,7 @@ Keep your greeting natural, warm and professional. Keep it to 2-3 sentences maxi
 def handle_audio_stream_start():
     """Handle start of audio streaming"""
     session_id = request.sid
-    print(f'🎙️ Audio stream started for session: {session_id}')
+    print(f'️ Audio stream started for session: {session_id}')
     
     # Initialize buffer for this session
     audio_stream_buffers[session_id] = []
@@ -617,7 +617,7 @@ def handle_audio_stream_data(data):
         audio_chunk = data.get('audio', [])
         
         if not audio_chunk:
-            print(f'⚠️ Received empty audio chunk for session: {session_id}')
+            print(f'️ Received empty audio chunk for session: {session_id}')
             return
         
         # Accumulate audio chunks in buffer
@@ -630,14 +630,14 @@ def handle_audio_stream_data(data):
         # Log progress every few chunks
         total_samples = len(audio_stream_buffers[session_id])
         if total_samples % 8000 == 0 and total_samples > 0:  # Log every 0.5 seconds
-            print(f'📊 Buffered {total_samples} samples ({total_samples/16000:.2f}s) for session: {session_id}')
+            print(f' Buffered {total_samples} samples ({total_samples/16000:.2f}s) for session: {session_id}')
         
         # Log first chunk to confirm receiving
         if total_samples == chunk_size:
-            print(f'📥 First audio chunk received: {chunk_size} samples for session: {session_id}')
+            print(f' First audio chunk received: {chunk_size} samples for session: {session_id}')
         
     except Exception as e:
-        print(f'❌ Error processing audio chunk: {str(e)}')
+        print(f' Error processing audio chunk: {str(e)}')
         import traceback
         traceback.print_exc()
 
@@ -661,11 +661,11 @@ def handle_audio_stream_end(data=None):
     # Process audio in a background thread to prevent blocking and timeout
     def process_audio_async():
         try:
-            print(f'🔚 Received audio_stream_end for session: {session_id}')
+            print(f' Received audio_stream_end for session: {session_id}')
             
             # Get accumulated audio from buffer
             if session_id not in audio_stream_buffers or not audio_stream_buffers[session_id]:
-                print(f'⚠️ No audio data buffered for session: {session_id}')
+                print(f'️ No audio data buffered for session: {session_id}')
                 print(f'   Buffer exists: {session_id in audio_stream_buffers}')
                 if session_id in audio_stream_buffers:
                     print(f'   Buffer length: {len(audio_stream_buffers[session_id])}')
@@ -673,7 +673,7 @@ def handle_audio_stream_end(data=None):
                 socketio.emit('error', {'message': 'No audio data received. Please speak clearly and try again.'}, room=session_id)
                 return
             
-            print(f'🎧 Processing {len(audio_stream_buffers[session_id])} audio samples for session: {session_id}')
+            print(f' Processing {len(audio_stream_buffers[session_id])} audio samples for session: {session_id}')
             
             # Convert PCM samples to bytes
             import struct
@@ -683,7 +683,7 @@ def handle_audio_stream_end(data=None):
             min_samples = 16000 * 0.2  # 0.2 seconds minimum (very lenient)
             
             if len(audio_samples) < min_samples:
-                print(f'⚠️ Audio too short: {len(audio_samples)} samples ({len(audio_samples)/16000:.2f}s) - minimum is {min_samples/16000:.2f}s')
+                print(f'️ Audio too short: {len(audio_samples)} samples ({len(audio_samples)/16000:.2f}s) - minimum is {min_samples/16000:.2f}s')
                 # Clear the buffer
                 audio_stream_buffers[session_id] = []
                 socketio.emit('transcription_result', {'transcript': '', 'confidence': 0}, room=session_id)
@@ -694,10 +694,10 @@ def handle_audio_stream_end(data=None):
             import array
             audio_array = array.array('h', audio_samples)
             max_amplitude = max(abs(min(audio_array)), abs(max(audio_array)))
-            print(f'🔊 Audio level check - Max amplitude: {max_amplitude} (threshold: 100)')
+            print(f' Audio level check - Max amplitude: {max_amplitude} (threshold: 100)')
             
             if max_amplitude < 100:  # Very quiet or silence
-                print(f'⚠️ Audio too quiet - max amplitude: {max_amplitude}')
+                print(f'️ Audio too quiet - max amplitude: {max_amplitude}')
                 audio_stream_buffers[session_id] = []
                 socketio.emit('transcription_result', {'transcript': '', 'confidence': 0}, room=session_id)
                 socketio.emit('error', {'message': 'Audio is too quiet. Please speak louder and closer to the microphone.'}, room=session_id)
@@ -726,20 +726,20 @@ def handle_audio_stream_end(data=None):
             )
             
             # Transcribe audio with extended timeout
-            print(f'🎯 Sending {len(audio_bytes)} bytes ({len(audio_samples)/16000:.2f}s) to Speech-to-Text API...')
+            print(f' Sending {len(audio_bytes)} bytes ({len(audio_samples)/16000:.2f}s) to Speech-to-Text API...')
             
             try:
                 # For long audio, use recognize with proper timeout handling
                 response = stt_client.recognize(config=config, audio=audio, timeout=300)  # 300 second (5 minute) timeout
             except Exception as stt_error:
-                print(f'❌ Speech-to-Text API error: {str(stt_error)}')
+                print(f' Speech-to-Text API error: {str(stt_error)}')
                 import traceback
                 traceback.print_exc()
                 socketio.emit('error', {'message': 'Speech recognition failed. Please try again.'}, room=session_id)
                 return
             
             if not response.results:
-                print('⚠️ No transcription results - audio may be silence or unclear')
+                print('️ No transcription results - audio may be silence or unclear')
                 print(f'   Audio was {len(audio_samples)/16000:.2f}s long with max amplitude {max_amplitude}')
                 socketio.emit('transcription_result', {'transcript': '', 'confidence': 0}, room=session_id)
                 # Ask user to repeat - more specific feedback
@@ -761,7 +761,7 @@ def handle_audio_stream_end(data=None):
             transcript = response.results[0].alternatives[0].transcript
             confidence = response.results[0].alternatives[0].confidence if hasattr(response.results[0].alternatives[0], 'confidence') else 1.0
             
-            print(f'📝 Transcription: "{transcript}" (confidence: {confidence:.2%})')
+            print(f' Transcription: "{transcript}" (confidence: {confidence:.2%})')
             
             # Send transcription to client
             socketio.emit('transcription_result', {
@@ -771,7 +771,7 @@ def handle_audio_stream_end(data=None):
             
             # Process with AI only if transcript has meaningful content
             if not transcript.strip() or len(transcript.strip()) < 3:
-                print('💭 Very short transcript - asking user to elaborate')
+                print(' Very short transcript - asking user to elaborate')
                 ai_response = "I heard you, but could you elaborate a bit more on that?"
                 
                 blend_data, audio_filename = generate_speech_and_animation(ai_response)
@@ -783,7 +783,7 @@ def handle_audio_stream_end(data=None):
                 return
             
             # Get AI response based on user's answer
-            print(f'🤖 Getting AI response for: "{transcript}"')
+            print(f' Getting AI response for: "{transcript}"')
             ai_response = get_ai_response(session_id, transcript)
             
             # Generate speech and animation
@@ -796,11 +796,11 @@ def handle_audio_stream_end(data=None):
                 'transcript': ai_response
             }, room=session_id)
             
-            print(f'✅ Complete AI response: {ai_response}')
+            print(f' Complete AI response: {ai_response}')
         
         except Exception as e:
             error_msg = f'Error processing audio stream: {str(e)}'
-            print(f'❌ {error_msg}')
+            print(f' {error_msg}')
             import traceback
             traceback.print_exc()
             socketio.emit('error', {'message': 'Failed to process your audio. Please try again.'}, room=session_id)
@@ -831,7 +831,7 @@ def handle_text_message(data):
         if not user_text:
             return
         
-        print(f'💬 Text message from {session_id}: {user_text}')
+        print(f' Text message from {session_id}: {user_text}')
         
         # Get AI response
         ai_response = get_ai_response(session_id, user_text)
@@ -846,7 +846,7 @@ def handle_text_message(data):
             'transcript': ai_response
         })
         
-        print(f'🗣️ AI responds: {ai_response}')
+        print(f'️ AI responds: {ai_response}')
     
     except Exception as e:
         print(f'Error handling text message: {str(e)}')
@@ -903,12 +903,12 @@ if __name__ == '__main__':
     host = '0.0.0.0' if os.environ.get('PORT') else '127.0.0.1'
     
     print(f"""
-    🚀 AI Interviewer Avatar Server Starting...
-    📍 Host: {host}
-    🔌 Port: {port}
-    🤖 AI Model: Gemini 2.5 Flash (via API)
-    🎤 Speech-to-Text: Enabled
-    🔊 Text-to-Speech: Enabled
+     AI Interviewer Avatar Server Starting...
+     Host: {host}
+     Port: {port}
+     AI Model: Gemini 2.5 Flash (via API)
+     Speech-to-Text: Enabled
+     Text-to-Speech: Enabled
     """)
     
     # Run with SocketIO
@@ -919,3 +919,4 @@ if __name__ == '__main__':
         debug=False,
         use_reloader=False
     )
+
