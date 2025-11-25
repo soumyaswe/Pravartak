@@ -30,10 +30,17 @@ export default function RoadmapPage() {
       const result = await response.json();
       
       if (result.success) {
+        // Check if we're using fallback content
+        if (result.usingFallback) {
+          console.warn('Using fallback roadmap:', result.message);
+        }
+        
         // Pass the career with AI-generated roadmap data
         const enhancedCareer = {
           ...career,
-          aiRoadmap: result.data
+          aiRoadmap: result.data,
+          usingFallback: result.usingFallback,
+          fallbackMessage: result.message
         };
         setSelectedCareer(enhancedCareer);
       } else {

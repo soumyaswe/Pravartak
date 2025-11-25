@@ -582,15 +582,26 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Roadmap generation error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      is503: error.message?.includes('503'),
+      isOverloaded: error.message?.includes('overloaded'),
+      isQuota: error.message?.includes('quota')
+    });
     
-    // Fallback for quota exceeded or other API errors
-    if (error.message?.includes('quota') || error.message?.includes('limit')) {
+    // Fallback for quota exceeded, overload, or other API errors
+    if (error.message?.includes('quota') || error.message?.includes('limit') || 
+        error.message?.includes('503') || error.message?.includes('overloaded') ||
+        error.message?.includes('All models failed')) {
+      console.log('⚠️ Using fallback roadmap due to API unavailability');
       const fallbackData = generateCareerSpecificFallback(career);
       // Validate URLs in fallback data
       const validatedFallback = await validateRoadmapUrls(fallbackData);
       return NextResponse.json({
         success: true,
-        data: validatedFallback
+        data: validatedFallback,
+        usingFallback: true,
+        message: 'AI service temporarily unavailable. Showing standard roadmap.'
       });
     }
 
