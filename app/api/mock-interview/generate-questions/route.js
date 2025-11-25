@@ -3,6 +3,66 @@ import { NextResponse } from 'next/server';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Fallback models in priority order
+const MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash-exp',
+  'gemini-1.5-flash'
+];
+
+// Helper function to retry with exponential backoff
+async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isLastRetry = i === maxRetries - 1;
+      const is503 = error.message?.includes('503') || error.message?.includes('overloaded');
+      const is429 = error.message?.includes('429') || error.message?.includes('quota');
+      
+      // Don't retry if it's not a retryable error
+      if (!is503 && !is429) {
+        throw error;
+      }
+      
+      if (isLastRetry) {
+        throw error;
+      }
+      
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = baseDelay * Math.pow(2, i);
+      console.log(`API: Retry ${i + 1}/${maxRetries} after ${delay}ms due to ${is503 ? '503' : '429'} error`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+// Helper function to try multiple models
+async function generateWithFallback(prompt, models = MODELS) {
+  let lastError = null;
+  
+  for (const modelName of models) {
+    try {
+      console.log(`API: Trying model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
+      
+      const result = await retryWithBackoff(async () => {
+        return await model.generateContent(prompt);
+      });
+      
+      console.log(`API: Successfully generated content with ${modelName}`);
+      return result;
+    } catch (error) {
+      console.log(`API: Model ${modelName} failed:`, error.message);
+      lastError = error;
+      // Continue to next model
+    }
+  }
+  
+  // All models failed
+  throw lastError || new Error('All models failed');
+}
+
 export async function POST(request) {
   try {
     console.log('API: Received request to generate questions');
@@ -50,7 +110,6 @@ export async function POST(request) {
     }
 
     console.log('API: GEMINI_API_KEY is present');
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Validate job role first
     const validationPrompt = `
@@ -60,7 +119,7 @@ export async function POST(request) {
     `;
 
     console.log('API: Validating job role:', jobRole);
-    const validationResult = await model.generateContent(validationPrompt);
+    const validationResult = await generateWithFallback(validationPrompt);
     const validationText = validationResult.response.text().trim().split('\n')[0].toUpperCase();
     console.log('API: Validation result:', validationText);
 
@@ -92,7 +151,7 @@ export async function POST(request) {
     `;
 
     console.log('API: Generating questions for:', jobRole);
-    const questionsResult = await model.generateContent(questionsPrompt);
+    const questionsResult = await generateWithFallback(questionsPrompt);
     const questionsText = questionsResult.response.text();
     console.log('API: Generated questions text:', questionsText);
     
@@ -183,6 +242,58 @@ export async function POST(request) {
       stack: error.stack
     });
     
+    // Check if it's a 503 overload error - return fallback questions
+    if (error.message?.includes('503') || error.message?.includes('overloaded')) {
+      console.log('API: Service overloaded, returning fallback questions');
+      const { jobRole } = await request.json().catch(() => ({ jobRole: 'Software Engineer' }));
+      
+      const fallbackQuestions = [
+        {
+          id: 1,
+          category: 'Introduction',
+          question: `Tell me about yourself and why you're interested in the ${jobRole} position.`,
+          difficulty: 'Easy',
+          timeLimit: 120,
+        },
+        {
+          id: 2,
+          category: 'Technical',
+          question: `What are the key skills and technologies required for a ${jobRole}?`,
+          difficulty: 'Medium',
+          timeLimit: 180,
+        },
+        {
+          id: 3,
+          category: 'Behavioral',
+          question: 'Describe a challenging situation you faced at work and how you handled it.',
+          difficulty: 'Medium',
+          timeLimit: 150,
+        },
+        {
+          id: 4,
+          category: 'Problem Solving',
+          question: `How would you approach a complex problem in your role as a ${jobRole}?`,
+          difficulty: 'Hard',
+          timeLimit: 240,
+        },
+        {
+          id: 5,
+          category: 'Leadership',
+          question: 'Tell me about a time when you had to work with a difficult team member.',
+          difficulty: 'Hard',
+          timeLimit: 200,
+        },
+      ];
+      
+      return NextResponse.json({
+        questions: fallbackQuestions,
+        jobRole,
+        isValid: true,
+        fallback: true,
+        message: 'AI service is temporarily overloaded. Using standard interview questions.'
+      });
+    }
+    
     // More specific error messages
     if (error.message?.includes('API key') || error.message?.includes('403') || error.message?.includes('leaked')) {
       return NextResponse.json(
@@ -192,7 +303,7 @@ export async function POST(request) {
         },
         { status: 403 }
       );
-    } else if (error.message?.includes('quota')) {
+    } else if (error.message?.includes('quota') || error.message?.includes('429')) {
       return NextResponse.json(
         { error: 'API quota exceeded. Please try again later.' },
         { status: 429 }

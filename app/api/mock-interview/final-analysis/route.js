@@ -3,6 +3,54 @@ import { NextResponse } from 'next/server';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Fallback models in priority order
+const MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash-exp',
+  'gemini-1.5-flash'
+];
+
+// Helper function to retry with exponential backoff
+async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isLastRetry = i === maxRetries - 1;
+      const is503 = error.message?.includes('503') || error.message?.includes('overloaded');
+      const is429 = error.message?.includes('429') || error.message?.includes('quota');
+      
+      if (!is503 && !is429) throw error;
+      if (isLastRetry) throw error;
+      
+      const delay = baseDelay * Math.pow(2, i);
+      console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+// Helper function to try multiple models
+async function generateWithFallback(prompt, models = MODELS) {
+  let lastError = null;
+  
+  for (const modelName of models) {
+    try {
+      console.log(`Trying model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await retryWithBackoff(async () => {
+        return await model.generateContent(prompt);
+      });
+      console.log(`Success with ${modelName}`);
+      return result;
+    } catch (error) {
+      console.log(`Model ${modelName} failed:`, error.message);
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('All models failed');
+}
+
 export async function POST(request) {
   try {
     const { history, jobRole } = await request.json();
@@ -14,7 +62,7 @@ export async function POST(request) {
       );
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // Model will be selected by generateWithFallback helper
 
     // Calculate averages and totals
     const avgWpm = history.reduce((sum, item) => sum + (item.wpm || 0), 0) / history.length;
@@ -66,7 +114,7 @@ export async function POST(request) {
       Keep the tone professional yet encouraging. Be specific and actionable in your recommendations.
     `;
 
-    const result = await model.generateContent(summaryPrompt);
+    const result = await generateWithFallback(summaryPrompt);
     const analysis = result.response.text();
 
     return NextResponse.json({
