@@ -1075,7 +1075,7 @@ function AppInterviewer() {
             <OrthographicCamera 
               makeDefault
               zoom={1800}
-              position={[0, 1.65, 1]}
+              position={[0, 1, 1]}
             />
 
             <Suspense fallback={null}>

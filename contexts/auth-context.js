@@ -22,6 +22,13 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Ensure auth is initialized before setting up listener
+    if (!auth) {
+      console.error('Firebase Auth is not initialized. Please check your Firebase configuration.');
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Check/create user in database via API
@@ -107,6 +114,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const signInWithGoogle = async () => {
+    if (!auth || !googleProvider) {
+      throw new Error('Firebase Auth is not initialized');
+    }
     try {
       // First try popup method
       const result = await signInWithPopup(auth, googleProvider);
@@ -139,6 +149,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signInWithEmail = async (email, password) => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized');
+    }
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       
@@ -156,6 +169,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signUpWithEmail = async (email, password, name) => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized');
+    }
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       
@@ -173,6 +189,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized');
+    }
     try {
       await signOut(auth);
     } catch (error) {
