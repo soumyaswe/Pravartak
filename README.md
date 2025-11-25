@@ -402,3 +402,4 @@ chmod +x .githooks/pre-commit
 ```
 
 The pre-commit hook runs a short PowerShell-based scan and will abort a commit if it finds likely secret patterns. This is an extra safety net — you should still rotate any keys you believe are compromised.
+# Deployment 2025-11-25 20:03:04
