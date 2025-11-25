@@ -59,6 +59,11 @@ allowed_origins = [
     "https://pravartak-backend--pravartak-15665.web.app",
     "https://pravartak-15665.web.app",
     "https://pravartak-15665.firebaseapp.com",
+    # Firebase App Hosting domains
+    "https://pravartak--pravartak-15665.asia-southeast1.hosted.app",
+    "https://pravartak-ai--pravartak-15665.asia-southeast1.hosted.app",
+    # Allow all Firebase and Cloud Run subdomains for development
+    "*",  # Temporarily allow all origins for testing
 ]
 # Add NEXT_PUBLIC_BASE_URL if available
 if os.environ.get('NEXT_PUBLIC_BASE_URL'):

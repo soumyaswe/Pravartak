@@ -26,13 +26,14 @@ Write-Host ""
 Write-Host "Step 2: Deploy to Cloud Run..." -ForegroundColor Yellow
 # Note: For service account credentials in Cloud Run, use volume mounts
 # The GEMINI_API_KEY will be available as an environment variable
+# PORT is automatically set by Cloud Run and cannot be overridden
 gcloud run deploy $SERVICE_NAME `
     --image gcr.io/$PROJECT_ID/$SERVICE_NAME `
     --platform managed `
     --region $REGION `
     --allow-unauthenticated `
     --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" `
-    --set-env-vars="GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,GCP_PROJECT_ID=$PROJECT_ID,PORT=8080,PRODUCTION=1" `
+    --set-env-vars="GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,GCP_PROJECT_ID=$PROJECT_ID,PRODUCTION=1" `
     --memory 2Gi `
     --cpu 2 `
     --timeout 300 `
