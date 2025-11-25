@@ -3,6 +3,54 @@ import { NextResponse } from 'next/server';
 
 import { validateAndFilterLinks, validateAndFilterLinksWithReplacement } from '@/lib/url-validator';
 
+// Fallback models in priority order
+const MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash-exp',
+  'gemini-1.5-flash'
+];
+
+// Helper function to retry with exponential backoff
+async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isLastRetry = i === maxRetries - 1;
+      const is503 = error.message?.includes('503') || error.message?.includes('overloaded');
+      const is429 = error.message?.includes('429') || error.message?.includes('quota');
+      
+      if (!is503 && !is429) throw error;
+      if (isLastRetry) throw error;
+      
+      const delay = baseDelay * Math.pow(2, i);
+      console.log(`Roadmap API: Retry ${i + 1}/${maxRetries} after ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+// Helper function to try multiple models
+async function generateWithFallback(genAI, prompt, models = MODELS) {
+  let lastError = null;
+  
+  for (const modelName of models) {
+    try {
+      console.log(`Roadmap API: Trying model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await retryWithBackoff(async () => {
+        return await model.generateContent(prompt);
+      });
+      console.log(`Roadmap API: Success with ${modelName}`);
+      return result;
+    } catch (error) {
+      console.log(`Roadmap API: Model ${modelName} failed:`, error.message);
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('All models failed');
+}
+
 const FICTIONAL_CAREERS_BLOCKLIST = [
   'jedi', 'wizard', 'dragon rider', 'superhero', 'hobbit', 'elf',
   'vampire hunter', 'time lord', 'starfleet'
@@ -475,12 +523,11 @@ export async function POST(request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const fullPrompt = `${SYSTEM_PROMPT}\n\nPlease generate a roadmap for the career: '${career}'`;
     
     console.log('Sending request to Gemini AI...');
-    const result = await model.generateContent(fullPrompt);
+    const result = await generateWithFallback(genAI, fullPrompt);
     const response = result.response;
     const text = response.text();
     console.log('Received response from Gemini AI');

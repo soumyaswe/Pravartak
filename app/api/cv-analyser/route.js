@@ -90,8 +90,8 @@ const initializeGemini = () => {
     }
     
     genAI = new GoogleGenerativeAI(apiKey);
-    model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    console.log("Gemini API configured successfully for CV analysis.");
+    model = getModelWithFallback(apiKey);
+    console.log("Gemini API configured successfully for CV analysis with fallback.");
   } catch (error) {
     console.error("Error configuring Gemini API for CV analysis:", error);
   }

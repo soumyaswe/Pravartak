@@ -1,11 +1,11 @@
 "use server";
 
-import { db } from "@/lib/prisma";
-import { getAuthenticatedUser } from "@/lib/auth-server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { db } from '@/lib/prisma';
+import { getAuthenticatedUser } from '@/lib/auth-server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getModelWithFallback } from '@/lib/gemini-fallback';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const model = getModelWithFallback(process.env.GEMINI_API_KEY);
 
 export const generateAIInsights = async (industry) => {
   const prompt = `

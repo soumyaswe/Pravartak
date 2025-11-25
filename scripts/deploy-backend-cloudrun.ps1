@@ -22,9 +22,9 @@ gcloud run deploy $SERVICE_NAME `
     --platform managed `
     --region $REGION `
     --allow-unauthenticated `
-    --set-env-vars="GEMINI_API_KEY=$((gcloud secrets versions access latest --secret=GEMINI_API_KEY --project=$PROJECT_ID))" `
-    --set-env-vars="GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID" `
-    --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID" `
+    --update-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" `
+    --update-secrets="GOOGLE_APPLICATION_CREDENTIALS=GOOGLE_APPLICATION_CREDENTIALS:latest" `
+    --set-env-vars="GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,GCP_PROJECT_ID=$PROJECT_ID,PORT=8080" `
     --project=$PROJECT_ID
 
 if ($LASTEXITCODE -ne 0) {
