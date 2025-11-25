@@ -36,10 +36,10 @@ runConfig:
     
     # ========================================
     # Firebase Client Configuration (Public)
-    # These are safe to expose as they're client-side
+    # These MUST be available at BUILD time for Next.js
     # ========================================
     - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-      secret: NEXT_PUBLIC_FIREBASE_API_KEY
+      value: AIzaSyD8pa4S7Kbyq_r96L9fRXomLNlCSJA28LU
       availability:
         - BUILD
         - RUNTIME
