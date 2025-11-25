@@ -35,10 +35,58 @@ runConfig:
         - RUNTIME
     
     # ========================================
+    # Firebase Client Configuration (Public)
+    # These are safe to expose as they're client-side
+    # ========================================
+    - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+      secret: NEXT_PUBLIC_FIREBASE_API_KEY
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+      value: pravartak-15665.firebaseapp.com
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      value: pravartak-15665
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+      value: pravartak-15665.firebasestorage.app
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+      value: "393621785566"
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+      value: 1:393621785566:web:44c4f82cb61b6dbe73ab4f
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    # ========================================
     # Backend Service URLs
     # ========================================
     - variable: NEXT_PUBLIC_BACKEND_URL
       secret: NEXT_PUBLIC_BACKEND_URL
       availability:
         - BUILD
+        - RUNTIME
+    
+    # ========================================
+    # Google Cloud Credentials (if needed for Speech-to-Text)
+    # ========================================
+    - variable: GOOGLE_APPLICATION_CREDENTIALS
+      secret: GOOGLE_APPLICATION_CREDENTIALS
+      availability:
         - RUNTIME
