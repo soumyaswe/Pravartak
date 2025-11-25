@@ -78,7 +78,7 @@ runConfig:
     # Backend Service URLs
     # ========================================
     - variable: NEXT_PUBLIC_BACKEND_URL
-      secret: NEXT_PUBLIC_BACKEND_URL
+      value: https://pravartak-backend-w5mkanjiva-uc.a.run.app
       availability:
         - BUILD
         - RUNTIME
