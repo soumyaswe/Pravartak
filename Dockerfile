@@ -16,13 +16,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Set environment variable for Prisma
+# Set environment variable for Prisma (placeholder for build)
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
-# Copy production environment variables for build
-COPY .env.production .env.production
-
 # Generate Prisma Client and build
+# Note: Production env vars are provided via Firebase App Hosting's apphosting.yaml
 RUN npx prisma generate
 RUN npm run build
 
