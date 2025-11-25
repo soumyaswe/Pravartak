@@ -19,7 +19,9 @@ import { Video, Mic, MicOff, VideoOff, Phone, MessageSquare, X, Check, FileText 
 const _ = require('lodash');
 
 // Use environment variable for backend URL (Cloud Run or local development)
+// IMPORTANT: This env var is set at BUILD time from Secret Manager
 const host = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5000'
+console.log('🔗 Backend URL:', host); // Debug log to verify URL
 
 // Initialize Socket.IO connection
 let socket = null;
