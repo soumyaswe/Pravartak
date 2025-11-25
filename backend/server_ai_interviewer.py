@@ -58,6 +58,7 @@ allowed_origins = [
     "http://127.0.0.1:8000",
     "https://pravartak-backend--pravartak-15665.web.app",
     "https://pravartak-15665.web.app",
+    "https://pravartak-15665.firebaseapp.com",
 ]
 # Add NEXT_PUBLIC_BASE_URL if available
 if os.environ.get('NEXT_PUBLIC_BASE_URL'):
@@ -74,7 +75,11 @@ CORS(app, resources={
 })
 
 # Initialize SocketIO with CORS and extended timeouts for long audio processing
-socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode='eventlet', 
+# For production (Cloud Run with gunicorn), use gevent instead of eventlet
+production_mode = os.environ.get('PRODUCTION', '').lower() in ('1', 'true', 'yes')
+async_mode = 'gevent' if production_mode else 'eventlet'
+
+socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode=async_mode, 
    ping_timeout=600,  # Increase timeout to 600 seconds (10 minutes) for very long audio processing
    ping_interval=120,  # Send ping every 120 seconds to keep connection alive
    max_http_buffer_size=100 * 1024 * 1024  # 100MB buffer for very large audio data

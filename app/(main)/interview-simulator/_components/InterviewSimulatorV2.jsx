@@ -18,7 +18,8 @@ import { Video, Mic, MicOff, VideoOff, Phone, MessageSquare, X, Check } from 'lu
 
 const _ = require('lodash');
 
-const host = 'http://127.0.0.1:5000'
+// Use environment variable for backend URL (Cloud Run or local development)
+const host = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5000'
 
 // Initialize Socket.IO connection
 let socket = null;
