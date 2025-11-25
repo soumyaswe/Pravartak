@@ -45,8 +45,9 @@ const initializeGemini = () => {
   
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("GEMINI_API_KEY environment variable is not set");
+    if (!apiKey || apiKey.trim() === '') {
+      console.error("GEMINI_API_KEY environment variable is not set or empty");
+      console.error("Available env vars:", Object.keys(process.env).filter(k => k.includes('GEMINI')));
       return;
     }
     
