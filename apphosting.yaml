@@ -84,6 +84,27 @@ runConfig:
         - RUNTIME
     
     # ========================================
+    # Google Cloud Configuration for Vertex AI
+    # ========================================
+    - variable: GOOGLE_CLOUD_PROJECT_ID
+      value: pravartak-15665
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: GCP_PROJECT_ID
+      value: pravartak-15665
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: GOOGLE_CLOUD_REGION
+      value: us-central1
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    # ========================================
     # Google Cloud Credentials (if needed for Speech-to-Text)
     # ========================================
     - variable: GOOGLE_APPLICATION_CREDENTIALS

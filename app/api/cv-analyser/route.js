@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVertexAIModel, generateWithFallback } from "@/lib/vertex-ai";
 import mammoth from "mammoth";
 import { marked } from "marked";
 
 // --- CV ANALYZER API (CONVERTED FROM PYTHON) ---
-// This API endpoint provides CV/Resume analysis using Google's Gemini AI
-// Required environment variable: GEMINI_API_KEY
+// This API endpoint provides CV/Resume analysis using Google's Vertex AI (Gemini)
+// Uses Application Default Credentials (no API key required)
 // 
 // Features implemented from Python version:
 // 1. Fictional job title blocklist
@@ -73,46 +73,13 @@ function formatAnalysisOutput(rawAnalysis) {
   }
 }
 
-// Initialize Gemini AI
-let genAI;
-let model;
-
-// Defer initialization until runtime
-const initializeGemini = () => {
-  if (genAI) return; // Already initialized
-  
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey.trim() === '') {
-      console.error("GEMINI_API_KEY environment variable is not set or empty");
-      console.error("Available env vars:", Object.keys(process.env).filter(k => k.includes('GEMINI')));
-      return;
-    }
-    
-    genAI = new GoogleGenerativeAI(apiKey);
-    model = getModelWithFallback(apiKey);
-    console.log("Gemini API configured successfully for CV analysis with fallback.");
-  } catch (error) {
-    console.error("Error configuring Gemini API for CV analysis:", error);
-  }
-};
+// Vertex AI model - initialized on demand
+function getModel() {
+  return getVertexAIModel('gemini-1.5-flash');
+}
 
 export async function POST(request) {
   try {
-    // Initialize Gemini on first request
-    initializeGemini();
-    
-    // Check if API is configured
-    if (!model) {
-      return NextResponse.json(
-        { 
-          error: "Gemini API is not configured. Please check your setup.", 
-          success: false 
-        },
-        { status: 500 }
-      );
-    }
-
     const formData = await request.formData();
     const file = formData.get("file");
     const jobTitle = formData.get("jobTitle");
@@ -309,11 +276,11 @@ export async function POST(request) {
         });
       }
 
-      console.log("Sending request to Gemini API...");
+      console.log("Sending request to Vertex AI...");
       
-      // Generate content with Gemini (exact structure from Python)
-      const result = await model.generateContent(promptParts);
-      const rawAnalysis = result.response.text();
+      // Generate content with Vertex AI (using fallback for reliability)
+      const result = await generateWithFallback(promptParts);
+      const rawAnalysis = result.response.candidates[0].content.parts[0].text;
       
       // Format the analysis to remove Markdown symbols while preserving structure
       const formattedAnalysis = formatAnalysisOutput(rawAnalysis);

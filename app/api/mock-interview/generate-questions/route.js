@@ -1,67 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getVertexAIModel, generateWithFallback } from '@/lib/vertex-ai';
 import { NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// Fallback models in priority order
-const MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash-exp',
-  'gemini-1.5-flash'
-];
-
-// Helper function to retry with exponential backoff
-async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      const isLastRetry = i === maxRetries - 1;
-      const is503 = error.message?.includes('503') || error.message?.includes('overloaded');
-      const is429 = error.message?.includes('429') || error.message?.includes('quota');
-      
-      // Don't retry if it's not a retryable error
-      if (!is503 && !is429) {
-        throw error;
-      }
-      
-      if (isLastRetry) {
-        throw error;
-      }
-      
-      // Exponential backoff: 1s, 2s, 4s
-      const delay = baseDelay * Math.pow(2, i);
-      console.log(`API: Retry ${i + 1}/${maxRetries} after ${delay}ms due to ${is503 ? '503' : '429'} error`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-}
-
-// Helper function to try multiple models
-async function generateWithFallback(prompt, models = MODELS) {
-  let lastError = null;
-  
-  for (const modelName of models) {
-    try {
-      console.log(`API: Trying model: ${modelName}`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      
-      const result = await retryWithBackoff(async () => {
-        return await model.generateContent(prompt);
-      });
-      
-      console.log(`API: Successfully generated content with ${modelName}`);
-      return result;
-    } catch (error) {
-      console.log(`API: Model ${modelName} failed:`, error.message);
-      lastError = error;
-      // Continue to next model
-    }
-  }
-  
-  // All models failed
-  throw lastError || new Error('All models failed');
-}
+// Vertex AI models configuration (fallback support built-in)
 
 export async function POST(request) {
   try {
@@ -77,40 +17,6 @@ export async function POST(request) {
       );
     }
 
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.trim() === '') {
-      console.error('API: GEMINI_API_KEY is not configured');
-      return NextResponse.json(
-        { 
-          error: 'AI service is not configured. Please set GEMINI_API_KEY in your .env file.',
-          hint: 'Get your API key from https://aistudio.google.com/app/apikey'
-        },
-        { status: 500 }
-      );
-    }
-    
-    // Optional: load list of known-leaked keys from an environment variable (avoid hardcoding keys in repo)
-    // Set `LEAKED_KEYS_JSON` to a JSON array of leaked keys at deploy time if you need this check.
-    const leakedKeys = (() => {
-      try {
-        return JSON.parse(process.env.LEAKED_KEYS_JSON || '[]');
-      } catch (e) {
-        return [];
-      }
-    })();
-
-    if (leakedKeys.length > 0 && leakedKeys.includes(process.env.GEMINI_API_KEY)) {
-      console.error('API: Using a leaked API key');
-      return NextResponse.json(
-        {
-          error: '🚨 Your API key has been reported as leaked and blocked by Google. Please generate a new key.',
-          hint: 'Provide a list of leaked keys via the LEAKED_KEYS_JSON environment variable.'
-        },
-        { status: 403 }
-      );
-    }
-
-    console.log('API: GEMINI_API_KEY is present');
-
     // Validate job role first
     const validationPrompt = `
       You are an expert career advisor. The user entered the job role: '${jobRole}'.
@@ -120,7 +26,7 @@ export async function POST(request) {
 
     console.log('API: Validating job role:', jobRole);
     const validationResult = await generateWithFallback(validationPrompt);
-    const validationText = validationResult.response.text().trim().split('\n')[0].toUpperCase();
+    const validationText = validationResult.response.candidates[0].content.parts[0].text.trim().split('\n')[0].toUpperCase();
     console.log('API: Validation result:', validationText);
 
     if (validationText.includes('INVALID')) {
@@ -152,7 +58,7 @@ export async function POST(request) {
 
     console.log('API: Generating questions for:', jobRole);
     const questionsResult = await generateWithFallback(questionsPrompt);
-    const questionsText = questionsResult.response.text();
+    const questionsText = questionsResult.response.candidates[0].content.parts[0].text;
     console.log('API: Generated questions text:', questionsText);
     
     // Parse questions from the response

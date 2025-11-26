@@ -46,7 +46,8 @@ else:
 
 # Now import Google Cloud clients (they will use the credentials we just set)
 from google.cloud import texttospeech, speech
-import google.generativeai as genai
+import vertexai
+from vertexai.preview.generative_models import GenerativeModel
 
 app = Flask(__name__)
 
@@ -94,27 +95,27 @@ socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode=async_
 tts_client = texttospeech.TextToSpeechClient()
 stt_client = speech.SpeechClient()
 
-# Initialize Gemini API (using API key instead of Vertex AI)
-gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
-if not gemini_api_key:
-    print('️ WARNING: GEMINI_API_KEY not set in environment variables')
-    print('Please set GEMINI_API_KEY in your .env file')
-else:
-    genai.configure(api_key=gemini_api_key)
-    print(' Gemini API configured successfully')
+# Initialize Vertex AI (uses service account - no API key needed!)
+project_id = os.environ.get('GOOGLE_CLOUD_PROJECT_ID') or os.environ.get('GCP_PROJECT_ID')
+location = os.environ.get('GOOGLE_CLOUD_REGION', 'us-central1')
 
-# Use Gemini 2.5 Flash
-try:
-    gemini_model = genai.GenerativeModel('gemini-2.5-flash')
-    print(' Using Gemini 2.5 Flash')
-except Exception as e:
-    print(f'️ Gemini 2.5 Flash not available, trying 2.0 Flash: {e}')
+if not project_id:
+    print('⚠️ WARNING: GOOGLE_CLOUD_PROJECT_ID not set in environment variables')
+    print('Please set GOOGLE_CLOUD_PROJECT_ID in your .env file')
+else:
     try:
-        gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        print(' Using Gemini 2.0 Flash Experimental')
-    except Exception as e2:
-        print(f'️ Falling back to 1.5 Flash: {e2}')
-        gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+        vertexai.init(project=project_id, location=location)
+        print(f'✅ Vertex AI initialized successfully (Project: {project_id}, Region: {location})')
+    except Exception as e:
+        print(f'❌ Error initializing Vertex AI: {e}')
+
+# Use Gemini via Vertex AI (no API key needed!)
+try:
+    gemini_model = GenerativeModel('gemini-1.5-flash')
+    print('✅ Using Gemini 1.5 Flash via Vertex AI')
+except Exception as e:
+    print(f'❌ Error loading Gemini model: {e}')
+    gemini_model = None
 
 # Directory to store generated audio files
 AUDIO_DIR = 'audio_files'
