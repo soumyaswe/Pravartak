@@ -28,10 +28,12 @@ runConfig:
     # ========================================
     # AI API Keys - Fallback for complex operations (file uploads, etc.)
     # Most routes use Vertex AI, but this is kept for backward compatibility
+    # Available at BUILD time for Next.js route initialization
     # ========================================
     - variable: GEMINI_API_KEY
       secret: GEMINI_API_KEY
       availability:
+        - BUILD
         - RUNTIME
     
     # ========================================
