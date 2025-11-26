@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // Force cache invalidation for Cloud Run deployment
+  generateBuildId: async () => {
+    return `build-${Date.now()}`;
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
