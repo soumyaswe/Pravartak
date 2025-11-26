@@ -75,7 +75,7 @@ function formatAnalysisOutput(rawAnalysis) {
 
 // Vertex AI model - initialized on demand
 function getModel() {
-  return getVertexAIModel('gemini-1.5-flash');
+  return getVertexAIModel('gemini-1.5-flash-002');
 }
 
 export async function POST(request) {
