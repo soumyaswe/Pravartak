@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVertexAIModel, generateWithFallback } from "@/lib/vertex-ai";
 
 // --- CAREER COUNSELING CHAT API ---
-// This API endpoint provides career counseling assistance using Google's Gemini AI
-// Required environment variable: GEMINI_API_KEY
+// This API endpoint provides career counseling assistance using Google's Gemini AI via Vertex AI
+// Uses service account authentication (no API keys required)
 // 
 // Guardrails implemented:
 // 1. CV/Resume analysis rejection
@@ -34,29 +34,19 @@ Follow these rules strictly:
 5.  **Be Concise and Professional:** Provide clear and helpful answers. Do not invent information.
 `;
 
-// Initialize Gemini AI
-let genAI;
+// Initialize Vertex AI models (no API keys required)
 let textModel;
 let visionModel;
 
-// Defer initialization until runtime, not during build
-const initializeGemini = () => {
-  if (genAI) return; // Already initialized
+const initializeVertexAI = () => {
+  if (textModel) return; // Already initialized
   
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey.trim() === '') {
-      console.error("GEMINI_API_KEY environment variable is not set or empty");
-      console.error("Available env vars:", Object.keys(process.env).filter(k => k.includes('GEMINI')));
-      return;
-    }
-    
-    genAI = new GoogleGenerativeAI(apiKey);
-    textModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
-    visionModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
-    console.log("Gemini API configured successfully.");
+    textModel = getVertexAIModel('gemini-2.0-flash-exp');
+    visionModel = getVertexAIModel('gemini-2.0-flash-exp');
+    console.log("Vertex AI configured successfully.");
   } catch (error) {
-    console.error("Error configuring Gemini API:", error);
+    console.error("Error configuring Vertex AI:", error);
   }
 };
 
@@ -109,7 +99,7 @@ function buildConversationContext(messageHistory, currentMessage) {
 export async function POST(request) {
   try {
     // Initialize Gemini on first request
-    initializeGemini();
+    initializeVertexAI();
     
     // Check if API is configured
     if (!textModel || !visionModel) {
@@ -170,10 +160,10 @@ export async function POST(request) {
       let response;
       if (hasImage) {
         // Use the vision model if there's an image (for future implementation)
-        response = await visionModel.generateContent(promptParts);
+        response = await generateWithFallback(promptParts);
       } else {
         // Use the text model if there's no image
-        response = await textModel.generateContent(promptParts);
+        response = await generateWithFallback(promptParts);
       }
 
       const botResponse = response.response.text();

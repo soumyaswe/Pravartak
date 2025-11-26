@@ -26,6 +26,15 @@ runConfig:
         - RUNTIME
     
     # ========================================
+    # AI API Keys - Fallback for complex operations (file uploads, etc.)
+    # Most routes use Vertex AI, but this is kept for backward compatibility
+    # ========================================
+    - variable: GEMINI_API_KEY
+      secret: GEMINI_API_KEY
+      availability:
+        - RUNTIME
+    
+    # ========================================
     # Firebase Client Configuration (Public)
     # These MUST be available at BUILD time for Next.js
     # ========================================

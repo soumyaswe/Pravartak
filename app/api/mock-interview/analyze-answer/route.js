@@ -1,55 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getVertexAIModel, generateWithFallback } from '@/lib/vertex-ai';
 import { NextResponse } from 'next/server';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// Fallback models in priority order
-const MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash-exp',
-  'gemini-1.5-flash'
-];
-
-// Helper function to retry with exponential backoff
-async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      const isLastRetry = i === maxRetries - 1;
-      const is503 = error.message?.includes('503') || error.message?.includes('overloaded');
-      const is429 = error.message?.includes('429') || error.message?.includes('quota');
-      
-      if (!is503 && !is429) throw error;
-      if (isLastRetry) throw error;
-      
-      const delay = baseDelay * Math.pow(2, i);
-      console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-}
-
-// Helper function to try multiple models
-async function generateWithFallback(prompt, models = MODELS) {
-  let lastError = null;
-  
-  for (const modelName of models) {
-    try {
-      console.log(`Trying model: ${modelName}`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await retryWithBackoff(async () => {
-        return await model.generateContent(prompt);
-      });
-      console.log(`Success with ${modelName}`);
-      return result;
-    } catch (error) {
-      console.log(`Model ${modelName} failed:`, error.message);
-      lastError = error;
-    }
-  }
-  throw lastError || new Error('All models failed');
-}
 
 export async function POST(request) {
   try {
@@ -68,13 +18,7 @@ export async function POST(request) {
       );
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      console.error('GEMINI_API_KEY is not configured');
-      return NextResponse.json(
-        { error: 'AI service is not configured. Please contact support.' },
-        { status: 500 }
-      );
-    }
+    // Vertex AI uses service account authentication - no API key needed
 
     // Model will be selected by generateWithFallback helper
 

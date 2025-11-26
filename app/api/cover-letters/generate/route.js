@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+import { getVertexAIModel, generateWithFallback } from "@/lib/vertex-ai";
 
 export async function POST(request) {
   try {
@@ -82,7 +79,7 @@ EXAMPLE FORMAT:
 
 Generate the cover letter HTML now following the exact format above:`;
 
-    const result = await model.generateContent(prompt);
+    const result = await generateWithFallback(prompt);
     let coverLetterContent = result.response.text();
 
     // Clean up markdown if present
