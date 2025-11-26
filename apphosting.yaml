@@ -26,6 +26,27 @@ runConfig:
         - RUNTIME
     
     # ========================================
+    # Google Cloud Project Configuration (CRITICAL for Vertex AI)
+    # ========================================
+    - variable: GOOGLE_CLOUD_PROJECT_ID
+      value: pravartak-15665
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: GCP_PROJECT_ID
+      value: pravartak-15665
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    - variable: GOOGLE_CLOUD_REGION
+      value: us-central1
+      availability:
+        - BUILD
+        - RUNTIME
+    
+    # ========================================
     # AI API Keys - Fallback for complex operations (file uploads, etc.)
     # Most routes use Vertex AI, but this is kept for backward compatibility
     # Available at BUILD time for Next.js route initialization
