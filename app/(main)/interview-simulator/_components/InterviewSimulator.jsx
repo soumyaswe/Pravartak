@@ -424,6 +424,7 @@ function AppInterviewer() {
   const videoRef = useRef();
   const mediaRecorderRef = useRef();
   const audioChunksRef = useRef([]);
+  const transcriptScrollRef = useRef(null);
 
   // UI State
   const [uiState, setUiState] = useState('lobby'); // 'lobby' | 'interview'
@@ -476,6 +477,18 @@ function AppInterviewer() {
   
   // Use ref to store media stream so cleanup can access it even if component unmounts before async completes
   const mediaStreamRef = useRef(null);
+  
+  // Auto-scroll transcript to bottom when new messages arrive
+  useEffect(() => {
+    if (transcriptScrollRef.current && conversationHistory.length > 0) {
+      // Small delay to ensure DOM has updated
+      setTimeout(() => {
+        if (transcriptScrollRef.current) {
+          transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+  }, [conversationHistory]);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -640,6 +653,7 @@ function AppInterviewer() {
 
       // Present safe message to user only for real errors
       if (message && !message.includes('No audio data')) {
+        console.error('❌ Socket error received:', message);
         setStatusMessage(`Error: ${message}`);
       }
     });
@@ -1129,14 +1143,13 @@ function AppInterviewer() {
         marginRight: showTranscript ? '400px' : '0',
         transition: 'margin-right 0.3s ease-out'
       }}>
-        {/* Interviewer Video - Full Screen */}
+        {/* Interviewer Video - Full Screen with padding on left side only */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: 0,
+          left: '100px',
           right: 0,
           bottom: 0,
-          width: '100%',
           height: '100%',
           backgroundColor: '#1a1a1a',
           overflow: 'hidden'
@@ -1498,18 +1511,25 @@ function AppInterviewer() {
           top: 0,
           right: 0,
           width: '400px',
-          height: '100%',
+          height: '100vh',
           background: 'rgba(0, 0, 0, 0.95)',
-          padding: '24px',
-          overflowY: 'auto',
           borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(20px)',
           display: 'flex',
           flexDirection: 'column',
           animation: 'slideIn 0.3s ease-out',
-          zIndex: 50
+          zIndex: 50,
+          overflow: 'hidden'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          {/* Fixed Header */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            padding: '24px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            flexShrink: 0
+          }}>
             <h3 style={{ color: '#fff', fontSize: '18px', fontWeight: '600', margin: 0 }}>
               Interview Transcript
             </h3>
@@ -1539,31 +1559,49 @@ function AppInterviewer() {
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+          {/* Scrollable Messages Container */}
+          <div 
+            ref={transcriptScrollRef}
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px', 
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              padding: '24px',
+              minHeight: 0
+            }}>
             {conversationHistory.length > 0 ? (
-              conversationHistory.map((message, index) => (
-                <div key={index}>
-                  <div style={{ 
-                    color: message.role === 'ai' ? '#8b5cf6' : '#3b82f6', 
-                    fontSize: '12px', 
-                    marginBottom: '6px', 
-                    fontWeight: '600' 
-                  }}>
-                    {message.role === 'ai' ? 'AI Interviewer:' : 'You:'}
+              <>
+                {conversationHistory.map((message, index) => (
+                  <div key={index}>
+                    <div style={{ 
+                      color: message.role === 'ai' ? '#8b5cf6' : '#3b82f6', 
+                      fontSize: '12px', 
+                      marginBottom: '6px', 
+                      fontWeight: '600' 
+                    }}>
+                      {message.role === 'ai' ? 'AI Interviewer:' : 'You:'}
+                    </div>
+                    <div style={{ 
+                      background: message.role === 'ai' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.15)', 
+                      padding: '12px 16px', 
+                      borderRadius: '12px',
+                      border: `1px solid ${message.role === 'ai' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+                      color: '#fff',
+                      fontSize: '14px',
+                      lineHeight: '1.5',
+                      wordWrap: 'break-word',
+                      overflowWrap: 'break-word'
+                    }}>
+                      {message.text}
+                    </div>
                   </div>
-                  <div style={{ 
-                    background: message.role === 'ai' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.15)', 
-                    padding: '12px 16px', 
-                    borderRadius: '12px',
-                    border: `1px solid ${message.role === 'ai' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
-                    color: '#fff',
-                    fontSize: '14px',
-                    lineHeight: '1.5'
-                  }}>
-                    {message.text}
-                  </div>
-                </div>
-              ))
+                ))}
+                {/* Spacer at bottom to ensure last message is fully visible */}
+                <div style={{ height: '24px', flexShrink: 0 }} />
+              </>
             ) : (
               <div style={{ textAlign: 'center', color: '#666', padding: '60px 20px', fontSize: '14px' }}>
                 The conversation will appear here...

@@ -3,6 +3,23 @@ Flask SocketIO backend server for AI Interviewer Avatar
 Integrates GCP Text-to-Speech, Speech-to-Text, and Google Gemini API
 """
 
+# Fix Windows console encoding for emojis
+import sys
+import io
+import codecs
+
+# On Windows, configure UTF-8 encoding for stdout/stderr to handle emojis
+if sys.platform == 'win32':
+    try:
+        # Try to set UTF-8 encoding for stdout/stderr
+        if hasattr(sys.stdout, 'buffer') and sys.stdout.encoding != 'utf-8':
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        if hasattr(sys.stderr, 'buffer') and sys.stderr.encoding != 'utf-8':
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    except (AttributeError, ValueError, OSError):
+        # If we can't set UTF-8, continue - Python will handle encoding errors with 'replace'
+        pass
+
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
@@ -10,7 +27,6 @@ import os
 import json
 import uuid
 from datetime import datetime
-import io
 import base64
 import threading
 from dotenv import load_dotenv, find_dotenv
@@ -136,12 +152,31 @@ else:
         print(f'❌ Error initializing Vertex AI: {e}')
 
 # Use Gemini via Vertex AI (no API key needed!)
-try:
-    gemini_model = GenerativeModel('gemini-1.5-flash')
-    print('✅ Using Gemini 1.5 Flash via Vertex AI')
-except Exception as e:
-    print(f'❌ Error loading Gemini model: {e}')
-    gemini_model = None
+# Try multiple models with fallback (in order of preference)
+# Note: gemini-1.5-flash is not available in this project - using 2.0 instead
+gemini_model = None
+model_names = [
+    'gemini-2.0-flash',      # Gemini 2.0 stable (confirmed working)
+    'gemini-2.0-flash-exp',  # Gemini 2.0 experimental (confirmed working as fallback)
+]
+
+for model_name in model_names:
+    try:
+        print(f'Attempting to load model: {model_name}...')
+        gemini_model = GenerativeModel(model_name)
+        print(f'✅ Successfully loaded {model_name} via Vertex AI')
+        break
+    except Exception as e:
+        print(f'⚠️ Failed to load {model_name}: {str(e)}')
+        continue
+
+if gemini_model is None:
+    print('❌ ERROR: Failed to load any Gemini model. AI responses will be disabled.')
+    print('   Please check:')
+    print('   1. GOOGLE_CLOUD_PROJECT_ID is set correctly')
+    print('   2. Vertex AI API is enabled for your project')
+    print('   3. Service account has proper permissions')
+    print('   4. Model names are correct for your region')
 
 # Directory to store generated audio files
 AUDIO_DIR = 'audio_files'
@@ -599,6 +634,20 @@ def handle_start_interview(data):
         position = data.get('position', 'Software Engineer') if data else 'Software Engineer'
         print(f' Starting interview for session: {session_id}, position: {position}')
         
+        # Check if Gemini model is initialized
+        if gemini_model is None:
+            error_msg = 'Gemini model is not initialized. Cannot generate AI responses.'
+            print(f'❌ {error_msg}')
+            emit('error', {'message': error_msg})
+            return
+        
+        # Check if TTS client is initialized before attempting to generate speech
+        if tts_client is None:
+            error_msg = 'Text-to-Speech client is not initialized. Interviewer cannot speak. Check service account permissions and TTS API access.'
+            print(f'❌ {error_msg}')
+            emit('error', {'message': error_msg})
+            return
+        
         # Initialize the chat session with system instruction
         if session_id not in chat_sessions:
             chat_sessions[session_id] = gemini_model.start_chat()
@@ -644,16 +693,10 @@ Keep your greeting natural, warm and professional. Keep it to 2-3 sentences maxi
         print(f'   Error type: {type(e).__name__}')
         import traceback
         traceback.print_exc()
-        emit('error', {'message': f'Failed to start interview: {error_msg}'})
-        error_msg = str(e)
-        print(f' Error starting interview: {error_msg}')
-        print(f' Error type: {type(e).__name__}')
-        import traceback
-        traceback.print_exc()
         
         # Send detailed error to client
         emit('error', {
-            'message': error_msg,
+            'message': f'Failed to start interview: {error_msg}',
             'type': type(e).__name__,
             'details': 'Check backend logs for full traceback'
         })

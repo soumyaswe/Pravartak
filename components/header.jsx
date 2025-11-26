@@ -12,6 +12,7 @@ import {
   LogOut,
   User,
   ArrowLeft,
+  Menu,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -104,26 +105,47 @@ export default function Header() {
   }
 
   return (
-    <header className={cn(
-      "fixed top-0 border-b border-border/20 bg-background/60 backdrop-blur-xl z-40 supports-[backdrop-filter]:bg-background/40 transition-all duration-300",
-      isDashboardPage ? (sidebarExpanded ? "left-0 md:left-64 right-0" : "left-0 md:left-20 right-0") : "left-0 right-0 w-full"
-    )}>
-      <nav className="container mx-auto px-3 h-20 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/">
-            <Image
-              src={"/logo.png"}
-              alt="Pravartak Logo"
-              width={220}
-              height={70}
-              className="h-14 py-1 w-auto object-contain"
-            />
-          </Link>
-          
-          {/* Back Button and Title for Interview Simulator */}
+    <header 
+      data-interview-simulator={isInterviewSimulatorPage ? "true" : undefined}
+      className={cn(
+        "fixed top-0 border-b border-border/20 bg-background/60 backdrop-blur-xl z-40 supports-[backdrop-filter]:bg-background/40 transition-all duration-300",
+        isDashboardPage ? (sidebarExpanded ? "left-0 md:left-64 right-0" : "left-0 md:left-20 right-0") : "inset-x-0 w-full",
+        isInterviewSimulatorPage && "max-w-none"
+      )}
+      style={isInterviewSimulatorPage ? { 
+        paddingLeft: 0, 
+        marginLeft: 0, 
+        left: 0
+      } : {}}
+    >
+      <nav 
+        className={cn(
+          "h-20 flex items-center justify-between w-full",
+          isInterviewSimulatorPage ? "pr-6" : "container mx-auto px-3"
+        )}
+        style={isInterviewSimulatorPage ? { 
+          paddingLeft: 0, 
+          marginLeft: 0, 
+          paddingRight: '24px'
+        } : {}}
+      >
+        <div 
+          className={cn(
+            "flex items-center",
+            isInterviewSimulatorPage ? "gap-4" : "gap-4"
+          )}
+          style={isInterviewSimulatorPage ? { marginLeft: 0, paddingLeft: 0 } : {}}
+        >
+          {/* Hamburger Menu, Back Button and Title for Interview Simulator - Leftmost Position */}
           {isInterviewSimulatorPage && (
-            <>
-              <div className="h-8 w-px bg-border/40" />
+            <div className="flex items-center gap-4" style={{ marginLeft: 0, paddingLeft: 0 }}>
+              <button
+                className="text-foreground hover:bg-muted rounded-md flex items-center justify-center"
+                aria-label="Toggle navigation menu"
+                style={{ padding: '8px', marginLeft: 0 }}
+              >
+                <Menu className="h-5 w-5" />
+              </button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -134,8 +156,19 @@ export default function Header() {
                 <span>Back</span>
               </Button>
               <span className="text-lg font-semibold text-foreground">Interview Simulator</span>
-            </>
+              <div className="h-8 w-px bg-border/40" />
+            </div>
           )}
+          
+          <Link href="/">
+            <Image
+              src={"/logo.png"}
+              alt="Pravartak Logo"
+              width={220}
+              height={70}
+              className="h-14 py-1 w-auto object-contain"
+            />
+          </Link>
         </div>
 
         {/* Action Buttons */}

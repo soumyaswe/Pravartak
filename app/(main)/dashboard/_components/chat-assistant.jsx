@@ -98,8 +98,8 @@ const ChatPopup = ({ isOpen, onClose }) => {
   const suggestedPrompts = [
     "What skills are in high demand for software engineers?",
     "How can I improve my resume for tech jobs?",
-    "What's the average salary for a data scientist?",
-    "Help me prepare for a product manager interview",
+    "Suggest a learning plan to become competent in [skill] in 90 days with weekly goals and projects.",
+    "Recommend career paths based on my strengths: ask 2 clarifying questions first.",
   ];
 
   // Handle suggested prompt click
