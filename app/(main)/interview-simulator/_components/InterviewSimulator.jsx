@@ -19,7 +19,9 @@ import { Video, Mic, MicOff, VideoOff, Phone, MessageSquare, X, Check, FileText 
 const _ = require('lodash');
 
 // Use environment variable for backend URL (Cloud Run or local development)
+// IMPORTANT: This env var is set at BUILD time from Secret Manager
 const host = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5000'
+console.log('🔗 Backend URL:', host); // Debug log to verify URL
 
 // Initialize Socket.IO connection
 let socket = null;
@@ -1102,61 +1104,63 @@ function AppInterviewer() {
 
           <Loader dataInterpolation={(p) => `Loading AI Interviewer... ${Math.round(p)}%`} />
         </div>
-        {/* User Video Feed - Bottom Right Corner of Interview Box */}
-        <div style={{
-          position: 'absolute',
-          bottom: '20px',
-          right: '20px',
-          zIndex: 10,
-          borderRadius: '12px',
-          overflow: 'hidden',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-          border: '2px solid rgba(139, 92, 246, 0.5)',
-          width: '200px',
-          height: '150px'
-        }}>
-          <video 
-            ref={videoRef}
-            autoPlay 
-            muted
-            playsInline
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              backgroundColor: '#000',
-              display: videoEnabled ? 'block' : 'none'
-            }}
-          />
-          {!videoEnabled && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: '#1a1a1a',
-              color: '#666'
-            }}>
-              <VideoOff className="w-8 h-8" />
-            </div>
-          )}
+      </div>
+
+      {/* User Video Feed - Positioned independently to overlap bottom right */}
+      <div style={{
+        position: 'absolute',
+        bottom: showTranscript ? 'calc((100vh - 70vh) / 2 + 20px)' : 'calc((100vh - 70vh) / 2 + 20px)',
+        right: showTranscript ? 'calc((100vw - 400px - 70vw) / 2 + 20px)' : 'calc((100vw - 70vw) / 2 + 20px)',
+        zIndex: 10,
+        borderRadius: '12px',
+        overflow: 'hidden',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+        border: '2px solid rgba(139, 92, 246, 0.5)',
+        width: '200px',
+        height: '150px',
+        transition: 'right 0.3s ease-out'
+      }}>
+        <video 
+          ref={videoRef}
+          autoPlay 
+          muted
+          playsInline
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            backgroundColor: '#000',
+            display: videoEnabled ? 'block' : 'none'
+          }}
+        />
+        {!videoEnabled && (
           <div style={{
             position: 'absolute',
-            bottom: '6px',
-            left: '6px',
-            background: 'rgba(0, 0, 0, 0.7)',
-            padding: '3px 8px',
-            borderRadius: '4px',
-            color: '#fff',
-            fontSize: '11px',
-            fontWeight: '500'
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#1a1a1a',
+            color: '#666'
           }}>
-            You
+            <VideoOff className="w-8 h-8" />
           </div>
+        )}
+        <div style={{
+          position: 'absolute',
+          bottom: '6px',
+          left: '6px',
+          background: 'rgba(0, 0, 0, 0.7)',
+          padding: '3px 8px',
+          borderRadius: '4px',
+          color: '#fff',
+          fontSize: '11px',
+          fontWeight: '500'
+        }}>
+          You
         </div>
       </div>
 
