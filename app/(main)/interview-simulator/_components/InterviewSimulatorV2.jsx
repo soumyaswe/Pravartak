@@ -285,13 +285,14 @@ export default function InterviewSimulatorV2() {
   // Initialize WebSocket connection
   useEffect(() => {
     socket = io(host, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'], // Include polling fallback for Cloud Run compatibility
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       timeout: 600000,  // 600 seconds (10 minutes) connection timeout for very long audio processing
       pingTimeout: 600000,  // 600 seconds ping timeout
-      pingInterval: 120000  // Ping every 120 seconds to keep connection alive
+      pingInterval: 120000,  // Ping every 120 seconds to keep connection alive
+      forceNew: true // Force new connection to avoid reusing stale connections
     });
 
     socket.on('connect', () => {
@@ -308,6 +309,14 @@ export default function InterviewSimulatorV2() {
 
     socket.on('connection_response', (data) => {
       console.log('🔗 Connection response:', data);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ Socket.IO connection error:', error);
+      // Safely handle undefined error or missing message property
+      const errorMessage = (error && error.message) ? error.message : 'Connection failed';
+      setStatusMessage(`Connection error: ${errorMessage}. Check backend URL: ${host}`);
+      setConnected(false);
     });
 
     socket.on('avatar_speaks', (data) => {

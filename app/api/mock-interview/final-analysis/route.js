@@ -65,7 +65,8 @@ export async function POST(request) {
     `;
 
     const result = await generateWithFallback(summaryPrompt);
-    const analysis = result.response.text();
+    // Vertex AI response format: result.response.candidates[0].content.parts[0].text
+    const analysis = result.response.candidates[0].content.parts[0].text;
 
     return NextResponse.json({
       analysis,

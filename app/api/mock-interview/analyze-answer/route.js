@@ -104,7 +104,8 @@ export async function POST(request) {
     let contentEvaluation;
     
     try {
-      const responseText = contentResult.response.text().trim();
+      // Vertex AI response format: contentResult.response.candidates[0].content.parts[0].text
+      const responseText = contentResult.response.candidates[0].content.parts[0].text.trim();
       console.log('Gemini response:', responseText);
       const jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
       contentEvaluation = JSON.parse(jsonText);

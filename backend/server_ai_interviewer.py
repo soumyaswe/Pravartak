@@ -91,9 +91,35 @@ socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode=async_
    max_http_buffer_size=100 * 1024 * 1024  # 100MB buffer for very large audio data
 )
 
-# Initialize Google Cloud clients
-tts_client = texttospeech.TextToSpeechClient()
-stt_client = speech.SpeechClient()
+# Initialize Google Cloud clients with error handling
+tts_client = None
+stt_client = None
+
+try:
+    print('🔊 Initializing Text-to-Speech client...')
+    tts_client = texttospeech.TextToSpeechClient()
+    print('✅ Text-to-Speech client initialized successfully')
+except Exception as e:
+    print(f'❌ ERROR: Failed to initialize Text-to-Speech client: {e}')
+    print(f'   Error type: {type(e).__name__}')
+    print('   This will prevent the interviewer from speaking!')
+    print('   Please check:')
+    print('   1. GOOGLE_APPLICATION_CREDENTIALS is set correctly')
+    print('   2. Service account has Text-to-Speech API enabled')
+    print('   3. Service account has proper permissions')
+    import traceback
+    traceback.print_exc()
+
+try:
+    print('🎤 Initializing Speech-to-Text client...')
+    stt_client = speech.SpeechClient()
+    print('✅ Speech-to-Text client initialized successfully')
+except Exception as e:
+    print(f'❌ ERROR: Failed to initialize Speech-to-Text client: {e}')
+    print(f'   Error type: {type(e).__name__}')
+    print('   This will prevent speech recognition!')
+    import traceback
+    traceback.print_exc()
 
 # Initialize Vertex AI (uses service account - no API key needed!)
 project_id = os.environ.get('GOOGLE_CLOUD_PROJECT_ID') or os.environ.get('GCP_PROJECT_ID')
@@ -328,7 +354,14 @@ def generate_blend_data_from_actual_duration(text, duration):
 
 def generate_speech_and_animation(text):
     """Generate speech audio and blend shape data"""
+    # Check if TTS client is initialized
+    if tts_client is None:
+        error_msg = 'Text-to-Speech client is not initialized. Cannot generate audio.'
+        print(f'❌ {error_msg}')
+        raise RuntimeError(error_msg)
+    
     try:
+        print(f'🎙️ Generating speech for: "{text[:50]}..."')
         # Configure TTS
         synthesis_input = texttospeech.SynthesisInput(text=text)
         
@@ -347,11 +380,19 @@ def generate_speech_and_animation(text):
         )
         
         # Synthesize speech
+        print(f'📞 Calling TTS API with voice: {voice.name}...')
         response = tts_client.synthesize_speech(
             input=synthesis_input,
             voice=voice,
             audio_config=audio_config
         )
+        
+        if not response or not response.audio_content:
+            error_msg = 'TTS API returned empty response'
+            print(f'❌ {error_msg}')
+            raise RuntimeError(error_msg)
+        
+        print(f'✅ TTS API returned {len(response.audio_content)} bytes of audio')
         
         # Save audio file
         filename = f'{uuid.uuid4()}.mp3'
@@ -359,6 +400,8 @@ def generate_speech_and_animation(text):
         
         with open(filepath, 'wb') as audio_file:
             audio_file.write(response.audio_content)
+        
+        print(f'💾 Saved audio file: {filepath} ({len(response.audio_content)} bytes)')
         
         # Get actual audio duration for perfect sync
         try:
@@ -582,18 +625,26 @@ Keep your greeting natural, warm and professional. Keep it to 2-3 sentences maxi
             ai_greeting = "Welcome back! Let's continue our interview. Please tell me about yourself."
         
         # Generate speech and animation
+        print(f'🎤 Generating speech for greeting...')
         blend_data, audio_filename = generate_speech_and_animation(ai_greeting)
         
         # Send to client
+        print(f'📤 Sending avatar_speaks event with audio: {audio_filename}')
         emit('avatar_speaks', {
             'blendData': blend_data,
             'filename': audio_filename,
             'transcript': ai_greeting
         })
         
-        print(f'️ AI says: {ai_greeting}')
+        print(f'✅ AI says: {ai_greeting}')
     
     except Exception as e:
+        error_msg = str(e)
+        print(f'❌ Error starting interview: {error_msg}')
+        print(f'   Error type: {type(e).__name__}')
+        import traceback
+        traceback.print_exc()
+        emit('error', {'message': f'Failed to start interview: {error_msg}'})
         error_msg = str(e)
         print(f' Error starting interview: {error_msg}')
         print(f' Error type: {type(e).__name__}')
@@ -798,18 +849,24 @@ def handle_audio_stream_end(data=None):
             ai_response = get_ai_response(session_id, transcript)
             
             # Generate speech and animation
+            print(f'🎤 Generating speech for AI response...')
             blend_data, audio_filename = generate_speech_and_animation(ai_response)
             
             # Send complete response to client
+            print(f'📤 Sending avatar_speaks event with audio: {audio_filename}')
             socketio.emit('avatar_speaks', {
                 'blendData': blend_data,
                 'filename': audio_filename,
                 'transcript': ai_response
             }, room=session_id)
             
-            print(f' Complete AI response: {ai_response}')
+            print(f'✅ Complete AI response sent: {ai_response}')
         
         except Exception as e:
+            print(f'❌ Error in process_audio_async: {str(e)}')
+            print(f'   Error type: {type(e).__name__}')
+            import traceback
+            traceback.print_exc()
             error_msg = f'Error processing audio stream: {str(e)}'
             print(f' {error_msg}')
             import traceback
@@ -848,20 +905,26 @@ def handle_text_message(data):
         ai_response = get_ai_response(session_id, user_text)
         
         # Generate speech and animation
+        print(f'🎤 Generating speech for text message response...')
         blend_data, audio_filename = generate_speech_and_animation(ai_response)
         
         # Send to client
+        print(f'📤 Sending avatar_speaks event with audio: {audio_filename}')
         emit('avatar_speaks', {
             'blendData': blend_data,
             'filename': audio_filename,
             'transcript': ai_response
         })
         
-        print(f'️ AI responds: {ai_response}')
+        print(f'✅ AI responds: {ai_response}')
     
     except Exception as e:
-        print(f'Error handling text message: {str(e)}')
-        emit('error', {'message': str(e)})
+        error_msg = str(e)
+        print(f'❌ Error handling text message: {error_msg}')
+        print(f'   Error type: {type(e).__name__}')
+        import traceback
+        traceback.print_exc()
+        emit('error', {'message': f'Failed to process message: {error_msg}'})
 
 
 # ==================== HTTP Routes ====================
@@ -871,19 +934,56 @@ def serve_audio(filename):
     """Serve generated audio files"""
     try:
         filepath = os.path.join(AUDIO_DIR, filename)
-        return send_file(filepath, mimetype='audio/mpeg')
+        print(f'📁 Serving audio file: {filepath}')
+        
+        # Check if file exists
+        if not os.path.exists(filepath):
+            print(f'❌ Audio file not found: {filepath}')
+            return jsonify({'error': f'Audio file not found: {filename}'}), 404
+        
+        # Log file size
+        file_size = os.path.getsize(filepath)
+        print(f'✅ Audio file found: {filename} ({file_size} bytes)')
+        
+        # Send file with proper CORS headers
+        response = send_file(filepath, mimetype='audio/mpeg')
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET'
+        return response
     except Exception as e:
+        print(f'❌ Error serving audio file {filename}: {str(e)}')
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 404
 
 
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
-    return jsonify({
+    status = {
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'active_sessions': len(chat_sessions)
-    })
+        'active_sessions': len(chat_sessions),
+        'tts_initialized': tts_client is not None,
+        'stt_initialized': stt_client is not None,
+        'gemini_initialized': gemini_model is not None
+    }
+    
+    # Check if critical services are available
+    if not tts_client:
+        status['status'] = 'degraded'
+        status['warnings'] = ['Text-to-Speech client not initialized - interviewer cannot speak']
+    if not stt_client:
+        if 'warnings' not in status:
+            status['warnings'] = []
+        status['warnings'].append('Speech-to-Text client not initialized - speech recognition disabled')
+    if not gemini_model:
+        if 'warnings' not in status:
+            status['warnings'] = []
+        status['warnings'].append('Gemini model not initialized - AI responses disabled')
+    
+    status_code = 200 if status['status'] == 'healthy' else 503
+    return jsonify(status), status_code
 
 
 @app.route('/talk', methods=['POST'])
@@ -908,6 +1008,21 @@ def talk():
         return jsonify({'error': str(e)}), 500
 
 
+# Print startup summary
+print('\n' + '='*60)
+print('🚀 AI Interviewer Backend Server - Startup Summary')
+print('='*60)
+print(f'✅ Text-to-Speech: {"Initialized" if tts_client else "❌ FAILED - Interviewer cannot speak!"}')
+print(f'✅ Speech-to-Text: {"Initialized" if stt_client else "❌ FAILED - Speech recognition disabled!"}')
+print(f'✅ Gemini Model: {"Initialized" if gemini_model else "❌ FAILED - AI responses disabled!"}')
+print(f'✅ Audio Directory: {AUDIO_DIR} (exists: {os.path.exists(AUDIO_DIR)})')
+if project_id:
+    print(f'✅ Project ID: {project_id}')
+else:
+    print('⚠️  Project ID: Not set')
+print('='*60)
+print()
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     # Cloud Run requires binding to 0.0.0.0, not 127.0.0.1
@@ -917,10 +1032,15 @@ if __name__ == '__main__':
      AI Interviewer Avatar Server Starting...
      Host: {host}
      Port: {port}
-     AI Model: Gemini 2.5 Flash (via API)
-     Speech-to-Text: Enabled
-     Text-to-Speech: Enabled
+     AI Model: {"Gemini 1.5 Flash (via Vertex AI)" if gemini_model else "❌ NOT INITIALIZED"}
+     Speech-to-Text: {"✅ Enabled" if stt_client else "❌ DISABLED"}
+     Text-to-Speech: {"✅ Enabled" if tts_client else "❌ DISABLED - Interviewer cannot speak!"}
     """)
+    
+    if not tts_client:
+        print('\n⚠️  WARNING: Text-to-Speech is not initialized!')
+        print('   The interviewer will NOT be able to speak.')
+        print('   Check your GOOGLE_APPLICATION_CREDENTIALS and service account permissions.\n')
     
     # Run with SocketIO
     socketio.run(

@@ -80,7 +80,8 @@ EXAMPLE FORMAT:
 Generate the cover letter HTML now following the exact format above:`;
 
     const result = await generateWithFallback(prompt);
-    let coverLetterContent = result.response.text();
+    // Vertex AI response format: result.response.candidates[0].content.parts[0].text
+    let coverLetterContent = result.response.candidates[0].content.parts[0].text;
 
     // Clean up markdown if present
     coverLetterContent = coverLetterContent

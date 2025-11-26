@@ -23,9 +23,6 @@ const _ = require('lodash');
 const host = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5000'
 console.log('🔗 Backend URL:', host); // Debug log to verify URL
 
-// Initialize Socket.IO connection
-let socket = null;
-
 function Avatar({ avatar_url, speak, setSpeak, text, setAudioSource, playing, blendData: externalBlendData }) {
 
   let gltf = useGLTF(avatar_url);
@@ -474,17 +471,30 @@ function AppInterviewer() {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [mediaStream, setMediaStream] = useState(null);
 
+  // Use ref to store socket instance per component (prevents conflicts when multiple instances mount)
+  const socketRef = useRef(null);
+  
+  // Use ref to store media stream so cleanup can access it even if component unmounts before async completes
+  const mediaStreamRef = useRef(null);
+
   // Initialize WebSocket connection
   useEffect(() => {
-    socket = io(host, {
-      transports: ['websocket'],
+    // Create socket instance for this component instance
+    socketRef.current = io(host, {
+      transports: ['websocket', 'polling'], // Include polling fallback for Cloud Run compatibility
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      timeout: 20000, // 20 second timeout
+      forceNew: true // Force new connection to avoid reusing stale connections
     });
 
+    const socket = socketRef.current;
+
     socket.on('connect', () => {
-      console.log('✅ Connected to server');
+      // Log which transport is being used (helpful for debugging Cloud Run issues)
+      const transport = socket.io.engine?.transport?.name || 'unknown';
+      console.log(`✅ Connected to server (transport: ${transport})`);
       setConnected(true);
       setStatusMessage('Connected - Ready to start');
     });
@@ -499,13 +509,44 @@ function AppInterviewer() {
       console.log('Connection response:', data);
     });
 
+    socket.on('connect_error', (error) => {
+      // Cloud Run doesn't support WebSocket transport, so this error is expected
+      // Socket.IO will automatically fall back to polling transport
+      // Only log if we're not already connected or if it's not a WebSocket error
+      if (socket.connected) {
+        // Already connected via polling, ignore WebSocket errors
+        return;
+      }
+      
+      // Log for debugging, but don't show to user immediately (polling might still work)
+      const errorMessage = (error && error.message) ? error.message : 'Connection failed';
+      
+      // Check if this is a WebSocket error (common on Cloud Run)
+      const isWebSocketError = errorMessage.includes('websocket') || errorMessage.includes('WebSocket');
+      
+      if (isWebSocketError) {
+        // Expected for Cloud Run - polling will be used instead
+        console.log('⚠️ WebSocket transport failed (expected on Cloud Run), falling back to polling...');
+      } else {
+        // Real connection error
+        console.error('❌ Socket.IO connection error:', error);
+        setStatusMessage(`Connection error: ${errorMessage}. Check backend URL: ${host}`);
+        setConnected(false);
+      }
+    });
+
     socket.on('avatar_speaks', (data) => {
-      console.log(' Avatar speaking - BlendData frames:', data.blendData?.length || 0);
-      console.log(' Audio file:', data.filename);
-      console.log(' Transcript:', data.transcript);
+      console.log('🎤 Avatar speaking - BlendData frames:', data.blendData?.length || 0);
+      console.log('📁 Audio file:', data.filename);
+      console.log('💬 Transcript:', data.transcript);
       
       setBlendData(data.blendData);
-      setAudioSource(host + data.filename);
+      
+      // Construct full audio URL
+      const audioUrl = host + data.filename;
+      console.log('🔊 Setting audio source:', audioUrl);
+      setAudioSource(audioUrl);
+      
       setAiTranscript(data.transcript || '');
       setStatusMessage('AI Interviewer is speaking...');
       
@@ -560,12 +601,6 @@ function AppInterviewer() {
 
     socket.on('error', (data) => {
       // Defensive handling: server may send an empty object or string
-      console.error('❌ Socket error received');
-      console.error('Error data type:', typeof data);
-      console.error('Error data:', data);
-      console.error('Error keys:', data && typeof data === 'object' ? Object.keys(data) : 'N/A');
-      console.error('Error stringified:', JSON.stringify(data, null, 2));
-      
       let message = 'An unknown error occurred';
 
       try {
@@ -584,32 +619,29 @@ function AppInterviewer() {
           message = `Server Error: ${JSON.stringify(data).slice(0, 200)}`;
         }
       } catch (err) {
-        console.error('Error parsing:', err);
+        console.error('Error parsing socket error:', err);
         message = 'Error parsing server error payload';
       }
 
-      console.error('Parsed message:', message);
-      console.groupEnd();
-
-      // Log with centralized error handler (will be no-op in production until integrated)
-      try {
-        logError(new Error(message), { 
-          source: 'socket.error', 
-          payload: data, 
-          fullData: data,
-          dataType: typeof data,
-          dataKeys: data && typeof data === 'object' ? Object.keys(data) : []
-        });
-      } catch (e) {
-        // Fallback: only log in development
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Socket error logging failed', e);
-          console.error('Original error data:', data);
+      // Only log real errors, not warnings or empty objects
+      if (message && message !== 'An unknown error occurred' && !message.includes('No audio data')) {
+        console.error('❌ Socket error:', message);
+        
+        // Log with centralized error handler
+        try {
+          logError(new Error(message), { 
+            source: 'socket.error', 
+            payload: data
+          });
+        } catch (e) {
+          // Silently fail error logging
         }
       }
 
-      // Present safe message to user
-      setStatusMessage(`Error: ${message}`);
+      // Present safe message to user only for real errors
+      if (message && !message.includes('No audio data')) {
+        setStatusMessage(`Error: ${message}`);
+      }
     });
 
     socket.on('stream_ready', (data) => {
@@ -617,14 +649,13 @@ function AppInterviewer() {
     });
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
+      // Clean up socket for this component instance only
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
     };
-  }, []);
+  }, []); // Empty dependency array - socket should only initialize once on mount
 
   // Setup media devices
   useEffect(() => {
@@ -641,6 +672,8 @@ function AppInterviewer() {
           }
         });
 
+        // Store stream in ref so cleanup can access it even if component unmounts
+        mediaStreamRef.current = stream;
         setMediaStream(stream);
 
         // Set video stream when ref is available
@@ -656,7 +689,16 @@ function AppInterviewer() {
     }
 
     setupMedia();
-  }, []);
+
+    // Cleanup media stream when component unmounts or before setting new stream
+    return () => {
+      // Use ref to access stream - this works even if component unmounts before async completes
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array - setup media once on mount
 
   // Update video srcObject when mediaStream changes
   useEffect(() => {
@@ -684,13 +726,13 @@ function AppInterviewer() {
       return;
     }
 
-    if (!socket || !connected) {
+    if (!socketRef.current || !connected) {
       alert('Not connected to server. Please wait...');
       return;
     }
 
     console.log('🎬 Starting interview...');
-    socket.emit('start_interview', { position: selectedPosition.trim() });
+    socketRef.current.emit('start_interview', { position: selectedPosition.trim() });
     setInterviewStarted(true);
     setUiState('interview');
     setStatusMessage('Interview started - Waiting for AI...');
@@ -698,7 +740,7 @@ function AppInterviewer() {
 
   // Start recording user response
   const handleStartRecording = () => {
-    if (!mediaStream || !connected || !socket) return;
+    if (!mediaStream || !connected || !socketRef.current) return;
 
     try {
       audioChunksRef.current = [];
@@ -707,7 +749,7 @@ function AppInterviewer() {
 
       // Emit stream start
       console.log('📤 Emitting audio_stream_start...');
-      socket.emit('audio_stream_start');
+      socketRef.current.emit('audio_stream_start');
 
       // Create MediaRecorder with audio only
       const audioStream = new MediaStream(mediaStream.getAudioTracks());
@@ -741,6 +783,15 @@ function AppInterviewer() {
           
           console.log(`Received audio chunk: ${event.data.size} bytes, total chunks: ${audioChunksRef.current.length}`);
           
+          // Skip very small chunks (likely metadata or empty frames)
+          // WebM/Opus chunks should typically be at least a few KB
+          const MIN_CHUNK_SIZE = 100; // bytes
+          if (event.data.size < MIN_CHUNK_SIZE) {
+            console.log(`⚠️ Skipping small chunk (${event.data.size} bytes) - likely metadata`);
+            pendingProcessing--;  // Decrement since we're skipping
+            return;
+          }
+          
           // Convert chunk to PCM and send to backend immediately
           try {
             const audioBlob = event.data;
@@ -748,6 +799,7 @@ function AppInterviewer() {
             
             if (arrayBuffer.byteLength === 0) {
               console.warn('⚠️ Empty audio buffer, skipping...');
+              pendingProcessing--;  // Decrement since we're skipping
               return;
             }
             
@@ -759,17 +811,24 @@ function AppInterviewer() {
             // Decode audio data with error handling
             let audioBuffer;
             try {
-              audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+              // Clone the array buffer to avoid issues if it's already been read
+              audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
             } catch (decodeError) {
-              console.warn('Direct decode failed:', decodeError.message);
-              // Skip this chunk if decode fails
-              audioContext.close();
+              // Some chunks might be incomplete or invalid (e.g., partial frames)
+              // This is normal for streaming audio - just skip invalid chunks
+              console.log(`⚠️ Skipping chunk ${audioChunksRef.current.length} - decode failed (likely incomplete frame): ${decodeError.message}`);
+              pendingProcessing--;  // Decrement since we're skipping
+              // Close audio context and return early
+              audioContext.close().catch(() => {}); // Ignore close errors
               return;
             }
             
+            // Close audio context after decoding (we have the buffer, don't need context anymore)
+            audioContext.close().catch(() => {}); // Ignore close errors
+            
             if (!audioBuffer || audioBuffer.length === 0) {
               console.warn('Audio buffer is empty after decode');
-              audioContext.close();
+              pendingProcessing--;  // Decrement since we're skipping
               return;
             }
 
@@ -800,15 +859,14 @@ function AppInterviewer() {
             totalSamplesSent += pcmInt16.length;
             
             // Send PCM data to backend
-            if (socket && socket.connected) {
-              socket.emit('audio_stream_data', { audio: Array.from(pcmInt16) });
+            if (socketRef.current && socketRef.current.connected) {
+              socketRef.current.emit('audio_stream_data', { audio: Array.from(pcmInt16) });
               console.log(`Sent chunk ${audioChunksRef.current.length}: ${pcmInt16.length} samples to backend (total: ${totalSamplesSent}, ${(totalSamplesSent/16000).toFixed(2)}s)`);
             } else {
               console.error('Socket not connected, cannot send audio data');
             }
             
-            // Close audio context to free resources
-            audioContext.close();
+            pendingProcessing--;  // Decrement after successful processing
           } catch (err) {
             console.error('❌ Error processing audio chunk:', err);
           }
@@ -816,7 +874,7 @@ function AppInterviewer() {
           console.warn('⚠️ Received chunk with 0 size');
         }
       };      mediaRecorder.onstop = () => {
-        if (!socket) {
+        if (!socketRef.current) {
           console.error('Socket not available');
           setStatusMessage('Connection lost');
           return;
@@ -836,7 +894,7 @@ function AppInterviewer() {
         
         // Give a small delay for the final ondataavailable to process
         setTimeout(() => {
-          socket.emit('audio_stream_end');
+          socketRef.current.emit('audio_stream_end');
           setStatusMessage('🔄 Processing your response...');
           console.log(`✅ Audio stream end signal sent - total samples sent: ${totalSamplesSent} (${(totalSamplesSent/16000).toFixed(2)}s)`);
         }, 100);
@@ -876,8 +934,8 @@ function AppInterviewer() {
 
   // End interview
   const handleEndInterview = () => {
-    if (socket) {
-      socket.emit('end_interview');
+    if (socketRef.current) {
+      socketRef.current.emit('end_interview');
     }
     if (mediaStream) {
       mediaStream.getTracks().forEach(track => track.stop());
@@ -922,10 +980,31 @@ function AppInterviewer() {
   function playerReady(e) {
     console.log('🎧 Audio ready');
     if (audioPlayer.current) {
-      audioPlayer.current.audioEl.current.play();
+      audioPlayer.current.audioEl.current.play().catch(err => {
+        console.error('❌ Error playing audio:', err);
+        setStatusMessage('Error: Could not play audio. Please check console.');
+      });
       setPlaying(true);
     }
   }
+  
+  // Handle audio loading errors
+  useEffect(() => {
+    if (audioSource && audioPlayer.current) {
+      const audioEl = audioPlayer.current.audioEl?.current;
+      if (audioEl) {
+        const handleError = (e) => {
+          console.error('❌ Audio loading error:', e);
+          console.error('   Audio source:', audioSource);
+          console.error('   Error details:', audioEl.error);
+          setStatusMessage('Error: Could not load audio. Check backend audio route.');
+        };
+        
+        audioEl.addEventListener('error', handleError);
+        return () => audioEl.removeEventListener('error', handleError);
+      }
+    }
+  }, [audioSource]);
 
   // Lobby UI
   if (uiState === 'lobby') {
@@ -938,8 +1017,8 @@ function AppInterviewer() {
           }}>
             <OrthographicCamera 
               makeDefault
-              zoom={2000}
-              position={[0, 1.65, 1]}
+              zoom={2200}
+              position={[0, 1.75, 1.2]}
             />
             <Suspense fallback={null}>
               <Environment background={false} files="/images/photo_studio_loft_hall_1k.hdr" />
@@ -1030,55 +1109,62 @@ function AppInterviewer() {
     );
   }
 
-  // Interview Room UI
+  // Interview Room UI - Google Meet Style Layout
   return (
     <div style={{
       position: 'relative',
       width: '100%',
       height: '100vh',
       overflow: 'hidden',
-      backgroundColor: '#000',
+      backgroundColor: '#1a1a1a',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
+      flexDirection: 'column'
     }}>
-      {/* Centered Interview Box with Border */}
+      {/* Main Video Area - Interviewer fills the screen */}
       <div style={{
-        position: 'absolute',
-        top: '50%',
-        left: showTranscript ? 'calc((100% - 400px) / 2)' : '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '70%',
-        maxWidth: '900px',
-        height: '70%',
-        maxHeight: '600px',
-        border: '3px solid rgba(139, 92, 246, 0.5)',
-        borderRadius: '24px',
+        flex: 1,
+        position: 'relative',
         overflow: 'hidden',
-        zIndex: 1,
-        transition: 'left 0.3s ease-out'
+        backgroundColor: '#1a1a1a',
+        marginRight: showTranscript ? '400px' : '0',
+        transition: 'margin-right 0.3s ease-out'
       }}>
-        {/* 3D Avatar Canvas - Fill the entire box */}
+        {/* Interviewer Video - Full Screen */}
         <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
+          right: 0,
+          bottom: 0,
           width: '100%',
           height: '100%',
-          borderRadius: '24px',
+          backgroundColor: '#1a1a1a',
           overflow: 'hidden'
         }}>
           <Canvas 
             dpr={2} 
-            style={{ width: '100%', height: '100%' }}
-            onCreated={(ctx) => {
-              ctx.gl.physicallyCorrectLights = true;
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              display: 'block',
+              margin: 0,
+              padding: 0
+            }}
+            gl={{ 
+              antialias: true,
+              alpha: false,
+              powerPreference: "high-performance"
+            }}
+            onCreated={({ scene, gl }) => {
+              gl.physicallyCorrectLights = true;
+              // Set scene background to match container (dark gray to eliminate black spaces)
+              scene.background = new THREE.Color(0x1a1a1a);
             }}
           >
             <OrthographicCamera 
               makeDefault
-              zoom={1800}
-              position={[0, 1, 1]}
+              zoom={1900}
+              position={[0, 1.65, 1.3]}
             />
 
             <Suspense fallback={null}>
@@ -1104,20 +1190,54 @@ function AppInterviewer() {
 
           <Loader dataInterpolation={(p) => `Loading AI Interviewer... ${Math.round(p)}%`} />
         </div>
+        
+        {/* Status Message - Overlay on Interviewer */}
+        {statusMessage && (
+          <div style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10,
+            background: isRecording ? 'rgba(239, 68, 68, 0.9)' : 'rgba(139, 92, 246, 0.9)',
+            padding: '10px 24px',
+            borderRadius: '24px',
+            color: '#fff',
+            fontSize: '14px',
+            fontWeight: '500',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : 'none'
+          }}>
+            {isRecording && (
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#fff',
+                animation: 'blink 1s ease-in-out infinite'
+              }} />
+            )}
+            {statusMessage}
+          </div>
+        )}
       </div>
 
-      {/* User Video Feed - Positioned independently to overlap bottom right */}
+      {/* User Video Feed - Small box in bottom-right corner (Picture-in-Picture) - Positioned at root level */}
       <div style={{
         position: 'absolute',
-        bottom: showTranscript ? 'calc((100vh - 70vh) / 2 + 20px)' : 'calc((100vh - 70vh) / 2 + 20px)',
-        right: showTranscript ? 'calc((100vw - 400px - 70vw) / 2 + 20px)' : 'calc((100vw - 70vw) / 2 + 20px)',
-        zIndex: 10,
+        bottom: '100px', // Above control bar (control bar is ~80px + padding)
+        right: showTranscript ? '420px' : '24px', // Adjust when transcript is open
+        width: '240px',
+        height: '180px',
         borderRadius: '12px',
         overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-        border: '2px solid rgba(139, 92, 246, 0.5)',
-        width: '200px',
-        height: '150px',
+        backgroundColor: '#000',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+        border: '2px solid rgba(255, 255, 255, 0.1)',
+        zIndex: 15, // Above interviewer but below status message
         transition: 'right 0.3s ease-out'
       }}>
         <video 
@@ -1164,55 +1284,18 @@ function AppInterviewer() {
         </div>
       </div>
 
-      {/* Status Message - Top Center */}
-      {statusMessage && (
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 10,
-          background: isRecording ? 'rgba(239, 68, 68, 0.9)' : 'rgba(139, 92, 246, 0.9)',
-          padding: '10px 24px',
-          borderRadius: '24px',
-          color: '#fff',
-          fontSize: '14px',
-          fontWeight: '500',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : 'none'
-        }}>
-          {isRecording && (
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#fff',
-              animation: 'blink 1s ease-in-out infinite'
-            }} />
-          )}
-          {statusMessage}
-        </div>
-      )}
-
-      {/* Control Panel - Bottom Center (Bubble Style) */}
+      {/* Control Panel - Bottom Bar */}
       <div style={{
-        position: 'absolute',
-        bottom: '20px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 100,
+        width: '100%',
+        minHeight: '80px',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
         display: 'flex',
-        gap: '16px',
         alignItems: 'center',
-        background: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
         padding: '16px 24px',
-        borderRadius: '48px',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+        zIndex: 100,
+        backdropFilter: 'blur(10px)'
       }}>
         {/* Microphone Mute/Unmute Button */}
         <button
@@ -1518,8 +1601,8 @@ function Bg() {
   const texture = useTexture('/images/bg.webp');
 
   return (
-    <mesh position={[0, 1.5, -2]} scale={[0.8, 0.8, 0.8]}>
-      <planeGeometry />
+    <mesh position={[0, 1.6, -2.5]} scale={[4, 4, 1]}>
+      <planeGeometry args={[10, 10]} />
       <meshBasicMaterial map={texture} />
     </mesh>
   );

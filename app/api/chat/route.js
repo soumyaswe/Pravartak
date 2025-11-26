@@ -149,24 +149,51 @@ export async function POST(request) {
         ? buildConversationContext(messageHistory, message)
         : message;
 
-      // Prepare the content for the API call with conversation context
-      const promptParts = [
-        SYSTEM_PROMPT,
-        messageIsIncomplete 
-          ? `Note: The user's current message appears to be a continuation or follow-up to previous messages. Consider the conversation history to provide a coherent response.\n\n${contextualMessage}`
-          : contextualMessage
-      ];
-      
-      let response;
-      if (hasImage) {
-        // Use the vision model if there's an image (for future implementation)
-        response = await generateWithFallback(promptParts);
-      } else {
-        // Use the text model if there's no image
-        response = await generateWithFallback(promptParts);
+      // Validate that contextualMessage is not empty after processing
+      if (!contextualMessage || (typeof contextualMessage === 'string' && !contextualMessage.trim())) {
+        return NextResponse.json(
+          { 
+            error: "Message content is empty after processing. Please provide a valid message.", 
+            success: false 
+          },
+          { status: 400 }
+        );
       }
 
-      const botResponse = response.response.text();
+      // Prepare the content for the API call with conversation context
+      const userMessageText = messageIsIncomplete 
+        ? `Note: The user's current message appears to be a continuation or follow-up to previous messages. Consider the conversation history to provide a coherent response.\n\n${contextualMessage}`
+        : contextualMessage;
+      
+      // For text-only prompts, combine into a single string (more reliable than array format)
+      // For multimodal prompts with images, we'll use array format
+      let finalPrompt;
+      if (hasImage) {
+        // Use array format for multimodal content (future implementation)
+        finalPrompt = [
+          { text: SYSTEM_PROMPT },
+          { text: userMessageText }
+        ];
+      } else {
+        // Combine into single string for text-only prompts (more reliable)
+        finalPrompt = `${SYSTEM_PROMPT}\n\n${userMessageText}`;
+        
+        // Validate combined prompt is not empty
+        if (!finalPrompt || !finalPrompt.trim()) {
+          return NextResponse.json(
+            { 
+              error: "Failed to prepare prompt. Please try again with a valid message.", 
+              success: false 
+            },
+            { status: 400 }
+          );
+        }
+      }
+      
+      const result = await generateWithFallback(finalPrompt);
+
+      // Vertex AI response format: result.response.candidates[0].content.parts[0].text
+      const botResponse = result.response.candidates[0].content.parts[0].text;
 
       return NextResponse.json({
         response: botResponse,

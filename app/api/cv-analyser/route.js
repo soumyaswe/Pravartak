@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVertexAIModel, generateWithFallback } from "@/lib/vertex-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateWithFallback, MODELS } from "@/lib/gemini-fallback";
 import mammoth from "mammoth";
 import { marked } from "marked";
 
 // --- CV ANALYZER API (CONVERTED FROM PYTHON) ---
-// This API endpoint provides CV/Resume analysis using Google's Vertex AI (Gemini)
-// Uses Application Default Credentials (no API key required)
+// This API endpoint provides CV/Resume analysis using Google's Gemini API
+// Uses Gemini REST API for better PDF support and simpler configuration
 // 
 // Features implemented from Python version:
 // 1. Fictional job title blocklist
@@ -160,11 +161,10 @@ export async function POST(request) {
     try {
       console.log(`Analyzing file: ${file.name} for job: ${jobTitle}`);
       
-      // Prepare prompt parts (exact structure from Python)
-      const promptParts = [
-        SYSTEM_PROMPT, 
-        `\nHere is the analysis request:\n**Target Job Title:** ${jobTitle}\n\n**Resume Content:**\n`
-      ];
+      // Prepare prompt for Gemini API
+      // Gemini API accepts strings or arrays with text/inlineData parts
+      const jobTitlePrompt = `\nHere is the analysis request:\n**Target Job Title:** ${jobTitle}\n\n**Resume Content:**\n`;
+      const promptParts = [];
 
       // Handle different file types like Python version
       if (file.type === "application/pdf") {
@@ -179,30 +179,43 @@ export async function POST(request) {
           const pdfData = await pdfParse(buffer);
           const fileContent = pdfData.text;
           
-          console.log(`Extracted text length: ${fileContent.length} characters`);
+          console.log(`Extracted text length: ${fileContent ? fileContent.length : 0} characters`);
+          console.log(`Extracted text preview: "${fileContent ? fileContent.substring(0, 100) : 'null'}"`);
           
-          if (!fileContent.trim()) {
-            console.log("No text extracted from PDF, treating as image-based PDF");
-            // If no text extracted, treat it as an image (scanned PDF)
-            const base64 = buffer.toString('base64');
-            promptParts.push({
-              inlineData: {
-                data: base64,
-                mimeType: "application/pdf"
-              }
-            });
-            console.log("PDF sent as image for OCR processing");
+          if (!fileContent || typeof fileContent !== 'string' || !fileContent.trim()) {
+            console.log("No text extracted from PDF - likely a scanned/image-based PDF");
+            return NextResponse.json(
+              { 
+                error: "Unable to extract text from this PDF. The PDF appears to be scanned or image-based. Please ensure your PDF contains selectable text, or upload it as an image (PNG, JPG) instead.", 
+                success: false 
+              },
+              { status: 400 }
+            );
           } else {
-            promptParts.push(fileContent);
-            console.log("PDF text extracted successfully");
+            // Validate fileContent is not empty before adding
+            const trimmedContent = fileContent.trim();
+            if (!trimmedContent) {
+              console.log("Extracted text is empty after trimming");
+              return NextResponse.json(
+                { 
+                  error: "Unable to extract text from this PDF. The PDF appears to be empty or scanned. Please ensure your PDF contains selectable text, or upload it as an image (PNG, JPG) instead.", 
+                  success: false 
+                },
+                { status: 400 }
+              );
+            } else {
+              // Add text content for Gemini API
+              promptParts.push({ text: trimmedContent });
+              console.log(`PDF text extracted successfully: ${trimmedContent.length} characters`);
+            }
           }
         } catch (pdfError) {
           console.error("Error processing PDF file:", pdfError);
           console.error("PDF error details:", pdfError.message);
           
-          // Fallback: Try treating PDF as image if text extraction fails
+          // Fallback: Send PDF directly to Gemini API (it can handle PDFs)
           try {
-            console.log("Attempting fallback: treating PDF as image");
+            console.log("Attempting fallback: sending PDF directly to Gemini API");
             const bytes = await file.arrayBuffer();
             const base64 = Buffer.from(bytes).toString('base64');
             promptParts.push({
@@ -211,7 +224,7 @@ export async function POST(request) {
                 mimeType: "application/pdf"
               }
             });
-            console.log("PDF sent as image (fallback method)");
+            console.log("PDF sent directly to Gemini API for OCR processing");
           } catch (fallbackError) {
             console.error("Fallback method also failed:", fallbackError);
             return NextResponse.json(
@@ -239,7 +252,7 @@ export async function POST(request) {
               { status: 400 }
             );
           }
-          promptParts.push(fileContent);
+          promptParts.push({ text: fileContent });
         } catch (docxError) {
           console.error("Error processing DOCX file:", docxError);
           return NextResponse.json(
@@ -262,11 +275,21 @@ export async function POST(request) {
             { status: 400 }
           );
         }
-        promptParts.push(fileContent);
+        promptParts.push({ text: fileContent });
       } else if (file.type.startsWith("image/")) {
         // Handle images (convert to base64 for Gemini)
         const bytes = await file.arrayBuffer();
         const base64 = Buffer.from(bytes).toString('base64');
+        
+        if (!base64 || base64.length === 0) {
+          return NextResponse.json(
+            { 
+              error: "Failed to process the image file. The file may be corrupted.", 
+              success: false 
+            },
+            { status: 400 }
+          );
+        }
         
         promptParts.push({
           inlineData: {
@@ -274,13 +297,128 @@ export async function POST(request) {
             mimeType: file.type
           }
         });
+      } else {
+        // Unknown file type - should not reach here due to earlier validation, but handle gracefully
+        console.error(`Unexpected file type: ${file.type}`);
+        return NextResponse.json(
+          { 
+            error: `Unsupported file type '${file.type}'. Please upload a PDF, DOCX, or an image (PNG, JPG, WEBP).`, 
+            success: false 
+          },
+          { status: 400 }
+        );
       }
 
-      console.log("Sending request to Vertex AI...");
+      // Validate that we have file content
+      if (!promptParts || promptParts.length === 0) {
+        console.error('❌ CV Analyser: No file content extracted');
+        return NextResponse.json(
+          { 
+            error: "Failed to process the file content. The file may be empty or corrupted. Please try uploading again.", 
+            success: false 
+          },
+          { status: 400 }
+        );
+      }
+
+      // Ensure at least one part has valid content
+      const hasValidContent = promptParts.some(part => {
+        if (part.text && typeof part.text === 'string' && part.text.trim().length > 0) {
+          return true;
+        }
+        if (part.inlineData && part.inlineData.data && part.inlineData.data.length > 0) {
+          return true;
+        }
+        return false;
+      });
+
+      if (!hasValidContent) {
+        console.error('❌ CV Analyser: No valid content found in promptParts');
+        return NextResponse.json(
+          { 
+            error: "No valid content found in the file. Please ensure the file contains text or is a valid document.", 
+            success: false 
+          },
+          { status: 400 }
+        );
+      }
+
+      // Log prompt structure for debugging
+      console.log("📋 Preparing prompt for Gemini API...");
+      console.log(`   Prompt parts: ${promptParts.length}`);
       
-      // Generate content with Vertex AI (using fallback for reliability)
-      const result = await generateWithFallback(promptParts);
-      const rawAnalysis = result.response.candidates[0].content.parts[0].text;
+      // Convert to Gemini API format
+      // Gemini API accepts: string or array of { text: string } or { inlineData: {...} }
+      const hasInlineData = promptParts.some(part => part.inlineData);
+      
+      let finalPrompt;
+      
+      // Build the complete prompt with system prompt and job title
+      const systemAndJobPrompt = `${SYSTEM_PROMPT}${jobTitlePrompt}`;
+      
+      if (hasInlineData) {
+        // Multimodal: text + inlineData (PDF/image)
+        const inlineDataPart = promptParts.find(part => part.inlineData);
+        const textParts = promptParts.filter(part => part.text).map(p => p.text);
+        const combinedText = textParts.length > 0 ? textParts.join('\n\n') : '';
+        
+        // Combine system prompt + job title + file content (if text) + inlineData
+        finalPrompt = [
+          { text: systemAndJobPrompt + (combinedText ? `\n\n${combinedText}` : '') },
+          inlineDataPart
+        ];
+        console.log(`✅ Multimodal prompt: text + ${inlineDataPart.inlineData.mimeType}`);
+      } else {
+        // Text-only: combine everything into a single string
+        const textParts = promptParts.map(part => part.text).filter(text => text && text.trim());
+        const combinedText = textParts.join('\n\n');
+        
+        if (!combinedText || !combinedText.trim()) {
+          console.error('❌ CV Analyser: No text content found');
+          return NextResponse.json(
+            { 
+              error: "Failed to prepare prompt content. The file may be empty or corrupted.", 
+              success: false 
+            },
+            { status: 400 }
+          );
+        }
+        
+        finalPrompt = systemAndJobPrompt + combinedText;
+        console.log(`✅ Text-only prompt: ${finalPrompt.length} characters`);
+      }
+      
+      // Validate prompt
+      if ((typeof finalPrompt === 'string' && !finalPrompt.trim()) || 
+          (Array.isArray(finalPrompt) && finalPrompt.length === 0)) {
+        console.error('❌ CV Analyser: finalPrompt is empty');
+        return NextResponse.json(
+          { 
+            error: "Failed to prepare prompt. The file content appears to be empty.", 
+            success: false 
+          },
+          { status: 400 }
+        );
+      }
+      
+      console.log(`📤 Sending prompt to Gemini API (type: ${typeof finalPrompt})`);
+      
+      // Check for API key
+      if (!process.env.GEMINI_API_KEY) {
+        console.error('❌ GEMINI_API_KEY not found in environment variables');
+        return NextResponse.json(
+          { 
+            error: "Server configuration error: Gemini API key not found. Please contact support.", 
+            success: false 
+          },
+          { status: 500 }
+        );
+      }
+      
+      // Generate content with Gemini API (using fallback for reliability)
+      const result = await generateWithFallback(process.env.GEMINI_API_KEY, finalPrompt, MODELS);
+      // Gemini API response format: result.response.text()
+      const rawAnalysis = result.response.text();
       
       // Format the analysis to remove Markdown symbols while preserving structure
       const formattedAnalysis = formatAnalysisOutput(rawAnalysis);

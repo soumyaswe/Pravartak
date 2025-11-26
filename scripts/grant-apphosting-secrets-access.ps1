@@ -40,10 +40,24 @@ foreach ($SECRET in $SECRETS) {
 }
 
 Write-Host ""
+Write-Host "Step 2: Granting Vertex AI permissions..." -ForegroundColor Yellow
+gcloud projects add-iam-policy-binding $PROJECT_ID `
+    --member="serviceAccount:$SERVICE_ACCOUNT" `
+    --role="roles/aiplatform.user" `
+    --project=$PROJECT_ID 2>&1 | Out-Null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "  ✅ Granted Vertex AI User role to Firebase App Hosting service account" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠️  Failed to grant Vertex AI role (may already be granted)" -ForegroundColor Yellow
+}
+
+Write-Host ""
 Write-Host "Secret access configuration complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "1. Your apphosting.yaml already references these secrets" -ForegroundColor White
 Write-Host "2. Deploy your app: firebase apphosting:rollouts:create pravartak" -ForegroundColor White
 Write-Host "3. The secrets will be automatically injected at runtime" -ForegroundColor White
+Write-Host "4. Vertex AI permissions are now configured" -ForegroundColor White
 

@@ -11,6 +11,7 @@ import {
   StarsIcon,
   LogOut,
   User,
+  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -23,12 +24,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
 import { useAuth } from "@/contexts/auth-context";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   
   // Check if we're on a dashboard page
   const isDashboardPage = pathname?.startsWith('/dashboard') || 
@@ -40,6 +42,9 @@ export default function Header() {
                          pathname?.startsWith('/industry-insights') ||
                          pathname?.startsWith('/roadmap') ||
                          pathname?.startsWith('/analytics');
+  
+  // Check if we're on interview-simulator page
+  const isInterviewSimulatorPage = pathname?.startsWith('/interview-simulator');
   
   // Get sidebar state from localStorage (synced across components)
   const [sidebarExpanded, setSidebarExpanded] = React.useState(true);
@@ -104,7 +109,7 @@ export default function Header() {
       isDashboardPage ? (sidebarExpanded ? "left-0 md:left-64 right-0" : "left-0 md:left-20 right-0") : "left-0 right-0 w-full"
     )}>
       <nav className="container mx-auto px-3 h-20 flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-4">
           <Link href="/">
             <Image
               src={"/logo.png"}
@@ -114,6 +119,23 @@ export default function Header() {
               className="h-14 py-1 w-auto object-contain"
             />
           </Link>
+          
+          {/* Back Button and Title for Interview Simulator */}
+          {isInterviewSimulatorPage && (
+            <>
+              <div className="h-8 w-px bg-border/40" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.back()}
+                className="gap-2 text-foreground hover:bg-muted"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
+              </Button>
+              <span className="text-lg font-semibold text-foreground">Interview Simulator</span>
+            </>
+          )}
         </div>
 
         {/* Action Buttons */}
