@@ -42,8 +42,8 @@ const initializeVertexAI = () => {
   if (textModel) return; // Already initialized
   
   try {
-    textModel = getVertexAIModel('gemini-1.5-flash-002');
-    visionModel = getVertexAIModel('gemini-1.5-flash-002');
+    textModel = getVertexAIModel('gemini-2.0-flash-exp');
+    visionModel = getVertexAIModel('gemini-2.0-flash-exp');
     console.log("Vertex AI configured successfully.");
   } catch (error) {
     console.error("Error configuring Vertex AI:", error);
