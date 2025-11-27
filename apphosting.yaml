@@ -101,31 +101,15 @@ runConfig:
     # Backend Service URLs
     # ========================================
     - variable: NEXT_PUBLIC_BACKEND_URL
-      value: https://pravartak-backend-w5mkanjiva-uc.a.run.app
+      secret: NEXT_PUBLIC_BACKEND_URL
       availability:
         - BUILD
         - RUNTIME
     
     # ========================================
     # Google Cloud Configuration for Vertex AI
+    # (Note: GOOGLE_CLOUD_PROJECT_ID already defined above)
     # ========================================
-    - variable: GOOGLE_CLOUD_PROJECT_ID
-      value: pravartak-15665
-      availability:
-        - BUILD
-        - RUNTIME
-    
-    - variable: GCP_PROJECT_ID
-      value: pravartak-15665
-      availability:
-        - BUILD
-        - RUNTIME
-    
-    - variable: GOOGLE_CLOUD_REGION
-      value: us-central1
-      availability:
-        - BUILD
-        - RUNTIME
     
     # ========================================
     # Google Cloud Credentials (if needed for Speech-to-Text)

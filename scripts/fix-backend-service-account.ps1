@@ -11,6 +11,24 @@ Write-Host ""
 Write-Host "Service Account: $SERVICE_ACCOUNT" -ForegroundColor Yellow
 Write-Host ""
 
+# Grant Secret Manager access for GEMINI_API_KEY and other secrets
+Write-Host "Step 0: Granting Secret Manager access..." -ForegroundColor Yellow
+$SECRETS = @("GEMINI_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS")
+
+foreach ($SECRET in $SECRETS) {
+    Write-Host "  Granting access to secret: $SECRET" -ForegroundColor White
+    gcloud secrets add-iam-policy-binding $SECRET `
+        --member="serviceAccount:$SERVICE_ACCOUNT" `
+        --role="roles/secretmanager.secretAccessor" `
+        --project=$PROJECT_ID 2>&1 | Out-Null
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "    ✅ Access granted to $SECRET" -ForegroundColor Green
+    } else {
+        Write-Host "    ⚠️  Warning: Could not grant access to $SECRET (may already be granted)" -ForegroundColor Yellow
+    }
+}
+
 # Grant Text-to-Speech permissions
 Write-Host "Step 1: Granting Text-to-Speech API permissions..." -ForegroundColor Yellow
 gcloud projects add-iam-policy-binding $PROJECT_ID `

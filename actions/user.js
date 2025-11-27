@@ -126,7 +126,9 @@ export async function getUserOnboardingStatus() {
     const user = await getAuthenticatedUser();
     
     if (!user) {
-      return { isOnboarded: false };
+      // If user is not authenticated, it's not an onboarding status, but an auth issue
+      // Let the client-side ProtectedRoute handle the redirect
+      return { isOnboarded: false, error: "User not authenticated" };
     }
 
     return {
@@ -134,7 +136,12 @@ export async function getUserOnboardingStatus() {
     };
   } catch (error) {
     console.error("Error checking onboarding status:", error);
-    return { isOnboarded: false };
+    // Distinguish between auth errors and other errors (e.g., database)
+    if (error.message?.includes("Authentication required") || error.message?.includes("User not found")) {
+      return { isOnboarded: false, error: error.message };
+    }
+    // For other errors (e.g., database connection), return false but don't redirect
+    return { isOnboarded: false, error: "Failed to check onboarding status due to server error." };
   }
 }
 

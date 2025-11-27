@@ -144,9 +144,13 @@ export async function saveQuizResult(questions, answers, score) {
 }
 
 export async function getAssessments() {
-  const user = await getAuthenticatedUser();
-
   try {
+    const user = await getAuthenticatedUser();
+    
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
     const assessments = await db.assessment.findMany({
       where: {
         userId: user.id,
@@ -159,6 +163,17 @@ export async function getAssessments() {
     return assessments;
   } catch (error) {
     console.error("Error fetching assessments:", error);
-    throw new Error("Failed to fetch assessments");
+    // If it's a database connection error, return empty array instead of throwing
+    // This allows the page to render and show an error message
+    if (error.message?.includes("DATABASE_URL") || error.message?.includes("database") || error.message?.includes("Environment variable not found")) {
+      console.warn("Database connection issue - returning empty assessments array");
+      return [];
+    }
+    // For auth errors, throw so the page can handle redirect
+    if (error.message?.includes("not authenticated") || error.message?.includes("Authentication required")) {
+      throw error;
+    }
+    // For other errors, return empty array
+    return [];
   }
 }
