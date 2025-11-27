@@ -27,8 +27,72 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
-const DashboardView = ({ insights }) => {
+const DashboardView = ({ insights, needsOnboarding = false }) => {
+  // Handle case when user needs to complete onboarding
+  if (needsOnboarding) {
+    return (
+      <div className="w-full py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Complete Your Profile to View Industry Insights</CardTitle>
+            <CardDescription>
+              To see personalized industry insights, please complete your onboarding by setting your industry.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              Industry insights provide personalized data about:
+            </p>
+            <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground mb-6">
+              <li>Salary ranges for different roles</li>
+              <li>Industry growth trends</li>
+              <li>In-demand skills</li>
+              <li>Market outlook and opportunities</li>
+            </ul>
+            <Link href="/onboarding">
+              <Button className="w-full sm:w-auto">
+                Complete Onboarding
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Handle case when insights are not available (e.g., database error)
+  if (!insights) {
+    return (
+      <div className="w-full py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Industry Insights Unavailable</CardTitle>
+            <CardDescription>
+              We're having trouble loading industry insights at the moment.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              This could be due to:
+            </p>
+            <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
+              <li>Database connection issues</li>
+              <li>Your industry not being set in your profile</li>
+              <li>Temporary service unavailability</li>
+            </ul>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Please try refreshing the page or check your database connection.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Transform salary data for the chart
   const salaryData = insights.salaryRanges.map((range) => ({

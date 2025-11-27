@@ -57,6 +57,7 @@ export default function ProfileView() {
     loading: loadingProfile,
     fn: getProfileFn,
     data: profileData,
+    error: profileError,
   } = useFetch(getUserProfile);
 
   const { loading: updatingProfile, fn: updateProfileFn, data: updateResult } =
@@ -154,9 +155,32 @@ export default function ProfileView() {
   }
 
   if (!profileData) {
+    // Check if it's a database connection error
+    const isDatabaseError = profileError?.message?.includes("Database connection") || 
+                            profileError?.message?.includes("Can't reach database");
+    
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Failed to load profile data</p>
+      <div className="text-center py-12 max-w-2xl mx-auto px-4">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-destructive mb-2">
+            Database Connection Error
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            {isDatabaseError 
+              ? "Unable to connect to the database. Please ensure your database is running."
+              : "Failed to load profile data. Please try again later."}
+          </p>
+          {isDatabaseError && (
+            <div className="text-sm text-muted-foreground space-y-2 mt-4 text-left bg-background/50 p-4 rounded">
+              <p className="font-medium">Quick Setup:</p>
+              <ol className="list-decimal list-inside space-y-1 ml-2">
+                <li>See <code className="bg-muted px-1 rounded">QUICK_FIX_DATABASE.md</code> for setup instructions</li>
+                <li>Or use a free cloud database (Neon, Supabase)</li>
+                <li>Make sure your <code className="bg-muted px-1 rounded">.env</code> file has the correct <code className="bg-muted px-1 rounded">DATABASE_URL</code></li>
+              </ol>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

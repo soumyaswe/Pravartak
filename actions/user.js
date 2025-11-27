@@ -117,7 +117,27 @@ export async function getUserProfile() {
     return user;
   } catch (error) {
     console.error("Error getting user profile:", error);
-    throw new Error("Failed to get user profile");
+    
+    // Check if it's a database connection error
+    if (error.message?.includes("Database connection failed") || 
+        error.message?.includes("Can't reach database") ||
+        error.message?.includes("connection") ||
+        error.message?.includes("DATABASE_URL")) {
+      throw new Error(
+        "Database connection failed. Please ensure your database is running. " +
+        "See QUICK_FIX_DATABASE.md for setup instructions."
+      );
+    }
+    
+    // Check if it's an authentication error
+    if (error.message?.includes("Authentication required") || 
+        error.message?.includes("Unauthorized") ||
+        error.message?.includes("log in")) {
+      throw error; // Re-throw auth errors as-is
+    }
+    
+    // Generic error
+    throw new Error(`Failed to get user profile: ${error.message}`);
   }
 }
 
