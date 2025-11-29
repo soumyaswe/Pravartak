@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (do NOT commit these)
 .env*
 !.env.example
+.env
 
 # Google Cloud credentials (NEVER commit these!)
 *credentials*.json
