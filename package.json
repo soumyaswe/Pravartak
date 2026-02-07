@@ -7,6 +7,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "amplify:sandbox": "npx ampx sandbox",
+    "amplify:deploy": "npx ampx pipeline-deploy --branch main --app-id YOUR_APP_ID",
     "postinstall": "prisma generate || echo 'Prisma generate skipped'",
     "prisma:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -50,6 +52,7 @@
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.10.91",
     "@uiw/react-md-editor": "^4.0.5",
+    "aws-amplify": "^6.16.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -83,12 +86,15 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@aws-amplify/backend": "^1.20.0",
+    "@aws-amplify/backend-cli": "^1.8.2",
     "@eslint/eslintrc": "^3",
     "@types/dompurify": "^3.0.5",
     "eslint": "^9",
     "eslint-config-next": "^15.5.3",
     "postcss": "^8",
     "prisma": "^6.2.1",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.9.3"
   }
 }

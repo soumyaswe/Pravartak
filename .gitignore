@@ -129,3 +129,12 @@ firebase-debug.log
 
 # Old config files
 .eslintrc.json
+
+# AWS Amplify Gen 2
+amplify_outputs.json
+amplify/data/resource.ts.bak
+.amplify/
+node_modules/.amplify/
+
+# Scripts folder
+scripts/
