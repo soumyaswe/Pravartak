@@ -1,71 +1,47 @@
 "use client";
 
 import { useAuth } from "@/contexts/auth-context";
-import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
-// Loading text with animated dots
-function LoadingText() {
-  const [dots, setDots] = useState('');
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots(prev => {
-        if (prev === '...') return '';
-        return prev + '.';
-      });
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <p className="text-muted-foreground">
-      Loading{dots}
-    </p>
-  );
-}
-
+/**
+ * ProtectedRoute Wrapper Component
+ * 
+ * Secures routes by:
+ * 1. Showing loading state while auth is being determined
+ * 2. Redirecting unauthenticated users to /sign-in
+ * 3. Preventing flash of protected content before redirect
+ */
 export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user && !isRedirecting) {
-      setIsRedirecting(true);
-      // Store the current path to redirect back after login
-      sessionStorage.setItem('redirectAfterLogin', pathname);
+    // Crucial: Only redirect when loading is complete AND user is null
+    if (!loading && !user) {
+      console.log('[ProtectedRoute] User not authenticated, redirecting to /sign-in');
       router.push("/sign-in");
     }
-  }, [user, loading, router, pathname, isRedirecting]);
+  }, [user, loading, router]);
 
-  // Show loading while auth is being determined
+  // Loading State: Prevent dashboard from rendering while checking auth
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <LoadingText />
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Show loading while redirecting
-  if (!user || isRedirecting) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Redirecting to sign in...</p>
-        </div>
-      </div>
-    );
+  // Not Authenticated: Return null to avoid flash of content before redirect
+  if (!user) {
+    return null;
   }
 
-  // User is authenticated, render the protected content
-  return children;
+  // Authenticated: Render protected content
+  return <>{children}</>;
 }

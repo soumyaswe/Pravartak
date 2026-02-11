@@ -22,29 +22,33 @@ export async function POST(request) {
       );
     }
 
-    const { firebaseUser } = requestData;
+    // Handle both Cognito (new) and Firebase (legacy) users
+    const userData = requestData.cognitoUser || requestData.firebaseUser;
     
-    if (!firebaseUser || !firebaseUser.uid) {
+    if (!userData || !userData.uid) {
       return NextResponse.json(
         { error: 'Invalid user data' },
         { status: 400 }
       );
     }
 
-    // Check if user already exists
+    console.log('[API /user] Syncing user:', userData.uid, 'Email:', userData.email);
+
+    // Check if user already exists (firebaseUserId stores both Firebase and Cognito IDs)
     const existingUser = await db.user.findUnique({
       where: {
-        firebaseUserId: firebaseUser.uid,
+        firebaseUserId: userData.uid,
       },
     });
 
     if (existingUser) {
+      console.log('[API /user] User already exists:', existingUser.email);
       return NextResponse.json({ user: existingUser });
     }
 
     // Create new user
-    const email = firebaseUser.email;
-    const name = firebaseUser.displayName || "User";
+    const email = userData.email;
+    const name = userData.displayName || "User";
 
     if (!email) {
       return NextResponse.json(
@@ -54,41 +58,45 @@ export async function POST(request) {
     }
 
     try {
-      // Use upsert to handle both firebaseUserId and update
+      console.log('[API /user] Creating new user:', email);
+      
+      // Use upsert to handle both creation and updates
       const newUser = await db.user.upsert({
         where: {
-          firebaseUserId: firebaseUser.uid,
+          firebaseUserId: userData.uid,
         },
         update: {
           name: name,
-          imageUrl: firebaseUser.photoURL || "",
+          imageUrl: userData.photoURL || "",
           // Don't update email to avoid conflicts
         },
         create: {
-          firebaseUserId: firebaseUser.uid,
+          firebaseUserId: userData.uid, // Stores both Firebase and Cognito user IDs
           name: name,
-          imageUrl: firebaseUser.photoURL || "",
+          imageUrl: userData.photoURL || "",
           email: email,
         },
       });
 
+      console.log('[API /user] User created successfully:', newUser.email);
       return NextResponse.json({ user: newUser });
     } catch (upsertError) {
       // If upsert fails due to email constraint, try to find by email
       if (upsertError.code === 'P2002') {
-        // Check if a user with this email exists but different firebaseUserId
+        // Check if a user with this email exists but different user ID
         const userByEmail = await db.user.findUnique({
           where: { email: email }
         });
         
-        if (userByEmail && userByEmail.firebaseUserId !== firebaseUser.uid) {
-          // Update the existing user's firebaseUserId
+        if (userByEmail && userByEmail.firebaseUserId !== userData.uid) {
+          // Update the existing user's ID (migration scenario)
+          console.log('[API /user] Updating existing user with new ID:', userData.uid);
           const updatedUser = await db.user.update({
             where: { email: email },
             data: {
-              firebaseUserId: firebaseUser.uid,
+              firebaseUserId: userData.uid,
               name: name,
-              imageUrl: firebaseUser.photoURL || "",
+              imageUrl: userData.photoURL || "",
             }
           });
           return NextResponse.json({ user: updatedUser });
@@ -97,12 +105,13 @@ export async function POST(request) {
       throw upsertError;
     }
   } catch (error) {
-    // Final fallback: try to retrieve user by firebaseUserId
-    if (error.code === 'P2002' && requestData?.firebaseUser?.uid) {
+    // Final fallback: try to retrieve user by ID
+    if (error.code === 'P2002' && requestData?.cognitoUser?.uid || requestData?.firebaseUser?.uid) {
       try {
+        const userId = requestData.cognitoUser?.uid || requestData.firebaseUser?.uid;
         const existingUser = await db.user.findUnique({
           where: {
-            firebaseUserId: requestData.firebaseUser.uid,
+            firebaseUserId: userId,
           },
         });
         if (existingUser) {
@@ -113,6 +122,7 @@ export async function POST(request) {
       }
     }
     
+    console.error('[API /user] Error:', error.message);
     return NextResponse.json(
       { error: `Failed to create/check user: ${error.message}` },
       { status: 500 }
