@@ -49,6 +49,9 @@ export default function SignInPage() {
       await signInWithEmail(formData.email, formData.password);
       console.log('[SignIn] Sign-in successful');
       
+      // Wait for Hub events to fire and cookies to be set
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       toast.success("Successfully signed in!");
       
       // Use router.push - Hub listener will handle state updates
@@ -75,6 +78,12 @@ export default function SignInPage() {
         errorMessage = "No account found with this email address.";
       } else if (error.name === 'UserNotConfirmedException') {
         errorMessage = "Please verify your email address first.";
+        toast.error(errorMessage);
+        // Redirect to confirm email page
+        setTimeout(() => {
+          router.push(`/confirm-email?username=${encodeURIComponent(formData.email)}`);
+        }, 1500);
+        return; // Exit early to avoid showing error toast again
       } else if (error.name === 'TooManyRequestsException') {
         errorMessage = "Too many failed attempts. Please try again later.";
       } else if (error.name === 'InvalidParameterException') {

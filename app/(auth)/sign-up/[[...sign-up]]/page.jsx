@@ -75,14 +75,29 @@ export default function SignUpPage() {
     setLoading(true);
     try {
       console.log('[SignUp] Starting sign-up process...');
-      await signUpWithEmail(formData.email, formData.password, formData.name);
-      console.log('[SignUp] Sign-up successful');
+      const result = await signUpWithEmail(formData.email, formData.password, formData.name);
+      console.log('[SignUp] Sign-up result:', result);
       
-      toast.success("Account created successfully!");
-      
-      // Use router.push - Hub listener will handle state updates
-      console.log('[SignUp] Redirecting to /onboarding...');
-      router.push("/onboarding");
+      // Check if email confirmation is required
+      if (result.nextStep?.signUpStep === 'CONFIRM_SIGN_UP') {
+        console.log('[SignUp] Email confirmation required, redirecting...');
+        
+        // Store password temporarily for auto sign-in after confirmation
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('pending-signup-password', formData.password);
+        }
+        
+        toast.success("Account created! Please check your email for the verification code.");
+        router.push(`/confirm-email?username=${encodeURIComponent(formData.email)}`);
+      } else {
+        // Auto-confirmed or already signed in
+        // Wait for Hub events to fire and cookies to be set
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        toast.success("Account created successfully!");
+        console.log('[SignUp] Redirecting to /onboarding...');
+        router.push("/onboarding");
+      }
     } catch (error) {
       console.error("Sign up error:", error);
       console.error("Error name:", error.name);
