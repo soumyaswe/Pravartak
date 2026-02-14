@@ -5,6 +5,9 @@ const nextConfig = {
   generateBuildId: async () => {
     return `build-${Date.now()}`;
   },
+  env: {
+    DATABASE_URL: process.env.DATABASE_URL, // Pass it through explicitly
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
