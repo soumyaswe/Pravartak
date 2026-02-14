@@ -4,11 +4,11 @@ import { db } from "@/lib/prisma";
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const firebaseUserId = searchParams.get("userId");
+    const cognitoUserId = searchParams.get("userId");
 
-    console.log("Dashboard stats request for user:", firebaseUserId);
+    console.log("Dashboard stats request for user:", cognitoUserId);
 
-    if (!firebaseUserId) {
+    if (!cognitoUserId) {
       console.error("No user ID provided");
       return NextResponse.json(
         { error: "User ID required" },
@@ -30,7 +30,7 @@ export async function GET(request) {
 
     // Find user
     const user = await db.user.findUnique({
-      where: { firebaseUserId },
+      where: { cognitoUserId },
       include: {
         profile: true,
       },

@@ -209,7 +209,7 @@ export default function MockInterviewPage() {
             : ["Keep practicing"];
 
           await saveMockInterviewToDb({
-            firebaseUserId: user.uid,
+            cognitoUserId: user.uid,
             type: "BEHAVIORAL", // or get from state
             industry: user.industry || "General",
             experienceLevel: user.experience || "INTERMEDIATE",

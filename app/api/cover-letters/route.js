@@ -5,9 +5,9 @@ import { db } from "@/lib/prisma";
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const firebaseUserId = searchParams.get("userId");
+    const cognitoUserId = searchParams.get("userId");
 
-    if (!firebaseUserId) {
+    if (!cognitoUserId) {
       return NextResponse.json(
         { error: "User ID required" },
         { status: 400 }
@@ -15,7 +15,7 @@ export async function GET(request) {
     }
 
     const user = await db.user.findUnique({
-      where: { firebaseUserId },
+      where: { cognitoUserId },
     });
 
     if (!user) {
@@ -50,9 +50,9 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { firebaseUserId, title, content, companyName, jobTitle, jobDescription, status } = body;
+    const { cognitoUserId, title, content, companyName, jobTitle, jobDescription, status } = body;
 
-    if (!firebaseUserId || !content) {
+    if (!cognitoUserId || !content) {
       return NextResponse.json(
         { error: "User ID and content are required" },
         { status: 400 }
@@ -60,13 +60,13 @@ export async function POST(request) {
     }
 
     let user = await db.user.findUnique({
-      where: { firebaseUserId },
+      where: { cognitoUserId },
     });
 
     if (!user) {
       user = await db.user.create({
         data: {
-          firebaseUserId,
+          cognitoUserId,
           email: body.email || "temp@example.com",
           name: body.name,
         },

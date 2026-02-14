@@ -138,3 +138,5 @@ node_modules/.amplify/
 
 # Scripts folder
 scripts/
+
+test-cognito-config.js

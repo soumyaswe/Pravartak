@@ -10,7 +10,7 @@ datasource db {
 
 model User {
   id            String    @id @default(uuid())
-  firebaseUserId String   @unique // firebase user id
+  cognitoUserId String    @unique // AWS Cognito user id (sub)
   email         String    @unique
   name          String?
   imageUrl      String?

@@ -6,7 +6,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const {
-      firebaseUserId,
+      cognitoUserId,
       type,
       industry,
       experienceLevel,
@@ -23,7 +23,7 @@ export async function POST(request) {
       recommendations,
     } = body;
 
-    if (!firebaseUserId || !questions || !responses) {
+    if (!cognitoUserId || !questions || !responses) {
       return NextResponse.json(
         { error: "User ID, questions, and responses are required" },
         { status: 400 }
@@ -31,13 +31,13 @@ export async function POST(request) {
     }
 
     let user = await db.user.findUnique({
-      where: { firebaseUserId },
+      where: { cognitoUserId },
     });
 
     if (!user) {
       user = await db.user.create({
         data: {
-          firebaseUserId,
+          cognitoUserId,
           email: body.email || "temp@example.com",
           name: body.name,
         },
@@ -98,10 +98,10 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const firebaseUserId = searchParams.get("userId");
+    const cognitoUserId = searchParams.get("userId");
     const limit = parseInt(searchParams.get("limit") || "10");
 
-    if (!firebaseUserId) {
+    if (!cognitoUserId) {
       return NextResponse.json(
         { error: "User ID required" },
         { status: 400 }
@@ -109,7 +109,7 @@ export async function GET(request) {
     }
 
     const user = await db.user.findUnique({
-      where: { firebaseUserId },
+      where: { cognitoUserId },
     });
 
     if (!user) {

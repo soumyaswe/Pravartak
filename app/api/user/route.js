@@ -34,10 +34,10 @@ export async function POST(request) {
 
     console.log('[API /user] Syncing user:', userData.uid, 'Email:', userData.email);
 
-    // Check if user already exists (firebaseUserId stores both Firebase and Cognito IDs)
+    // Check if user already exists
     const existingUser = await db.user.findUnique({
       where: {
-        firebaseUserId: userData.uid,
+        cognitoUserId: userData.uid,
       },
     });
 
@@ -63,7 +63,7 @@ export async function POST(request) {
       // Use upsert to handle both creation and updates
       const newUser = await db.user.upsert({
         where: {
-          firebaseUserId: userData.uid,
+          cognitoUserId: userData.uid,
         },
         update: {
           name: name,
@@ -71,7 +71,7 @@ export async function POST(request) {
           // Don't update email to avoid conflicts
         },
         create: {
-          firebaseUserId: userData.uid, // Stores both Firebase and Cognito user IDs
+          cognitoUserId: userData.uid,
           name: name,
           imageUrl: userData.photoURL || "",
           email: email,
@@ -88,13 +88,13 @@ export async function POST(request) {
           where: { email: email }
         });
         
-        if (userByEmail && userByEmail.firebaseUserId !== userData.uid) {
+        if (userByEmail && userByEmail.cognitoUserId !== userData.uid) {
           // Update the existing user's ID (migration scenario)
           console.log('[API /user] Updating existing user with new ID:', userData.uid);
           const updatedUser = await db.user.update({
             where: { email: email },
             data: {
-              firebaseUserId: userData.uid,
+              cognitoUserId: userData.uid,
               name: name,
               imageUrl: userData.photoURL || "",
             }
@@ -111,7 +111,7 @@ export async function POST(request) {
         const userId = requestData.cognitoUser?.uid || requestData.firebaseUser?.uid;
         const existingUser = await db.user.findUnique({
           where: {
-            firebaseUserId: userId,
+            cognitoUserId: userId,
           },
         });
         if (existingUser) {

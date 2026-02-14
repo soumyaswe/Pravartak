@@ -12,7 +12,7 @@ export async function generateQuiz() {
   const user = await getAuthenticatedUser();
 
   const userWithDetails = await db.user.findUnique({
-    where: { firebaseUserId: user.firebaseUserId },
+    where: { cognitoUserId: user.cognitoUserId },
     select: {
       industry: true,
       skills: true,

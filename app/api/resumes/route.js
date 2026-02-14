@@ -5,18 +5,18 @@ import { db } from "@/lib/prisma";
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const firebaseUserId = searchParams.get("userId");
+    const cognitoUserId = searchParams.get("userId");
 
-    if (!firebaseUserId) {
+    if (!cognitoUserId) {
       return NextResponse.json(
         { error: "User ID required" },
         { status: 400 }
       );
     }
 
-    // Find user by Firebase ID
+    // Find user by Cognito ID
     const user = await db.user.findUnique({
-      where: { firebaseUserId },
+      where: { cognitoUserId },
     });
 
     if (!user) {
@@ -52,25 +52,25 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { firebaseUserId, title, content, templateId, status } = body;
+    const { cognitoUserId, title, content, templateId, status } = body;
 
-    if (!firebaseUserId || !content) {
+    if (!cognitoUserId || !content) {
       return NextResponse.json(
         { error: "User ID and content are required" },
         { status: 400 }
       );
     }
 
-    // Find user by Firebase ID
+    // Find user by Cognito ID
     let user = await db.user.findUnique({
-      where: { firebaseUserId },
+      where: { cognitoUserId },
     });
 
     // Create user if doesn't exist
     if (!user) {
       user = await db.user.create({
         data: {
-          firebaseUserId,
+          cognitoUserId,
           email: body.email || "temp@example.com",
           name: body.name,
         },
